@@ -1,0 +1,12 @@
+manifest.json
+target/
+logs/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# IntelliJ
+*.iml
+.idea/
