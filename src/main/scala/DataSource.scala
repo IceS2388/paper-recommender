@@ -6,7 +6,11 @@ import scala.util.Random
 /**
   * 单条评分记录
   **/
-case class Rating(user: String, item: String, rating: Double, timestampe: Long)
+case class Rating(user: Int, item: Int, rating: Double, timestamp: Long) {
+  override def toString: String = {
+    s"Rating:{user:$user,item:$item,rating:$rating,timestamp:$timestamp}"
+  }
+}
 
 /**
   * TrainingData包含所有上面定义的Rating类型数据。
@@ -28,7 +32,7 @@ case class ActualResult(ratings: Array[Rating])
 /**
   * 用户ID和查询数量
   **/
-case class Query(user: String, num: Int) {
+case class Query(user: Int, num: Int) {
   override def toString: String = {
     s"{user:$user,num:$num}"
   }
@@ -46,8 +50,9 @@ class DataSource(dataFilePath: String = "data/ratings.csv") {
   private def getRatings(): Seq[Rating] = {
 
     Source.fromFile(dataFilePath).getLines().map(line => {
-      val data = line.split(",")
-      Rating(data(0), data(3), data(1).toDouble, data(2).toLong)
+      val data = line.toString.trim.split(",")
+      /* logger.info(line)*/
+      Rating(user = data(0).toInt, item = data(3).toInt, rating = data(1).toDouble, timestamp = data(2).toLong)
     }).toSeq
   }
 
@@ -55,12 +60,10 @@ class DataSource(dataFilePath: String = "data/ratings.csv") {
 
     require(0 < kFold && kFold < 1, "测试集的所占百分比，必须是0至1之间!")
 
-   /* val userRatings=getRatings().groupBy(_.user)
-    userRatings.map(r=>{
-      r.
-    })*/
 
     val ratings = getRatings().zipWithIndex
+    /*println(ratings.last)
+    Thread.sleep(1000)*/
 
     val trainThreashold = ((1 - kFold) * 100).toInt
     val trainingData: Seq[(Rating, Int)] = ratings.filter(rating => {
@@ -69,13 +72,13 @@ class DataSource(dataFilePath: String = "data/ratings.csv") {
     })
     val trainIndexs = trainingData.map(_._2).toSet
 
-    logger.info(s"训练集：${trainingData.size},测试集:${ratings.size-trainingData.size}")
-    trainingData.take(10).foreach(println)
+    logger.info(s"训练集：${trainingData.size},测试集:${ratings.size - trainingData.size}")
+    //trainingData.take(10).foreach(println)
 
-    val testingData: Seq[(String, Seq[Rating])] = ratings.filter(r => {
+    val testingData: Seq[(Int, Seq[Rating])] = ratings.filter(r => {
       !trainIndexs.contains(r._2)
     }).map(_._1).groupBy(_.user).toSeq.sortBy(_._1)
-    testingData.take(10).foreach(println)
+    //testingData.take(10).foreach(println)
 
     (new TrainingData(trainingData.map(_._1)), testingData.map {
       case (user, testRatings) => (Query(user, topN), ActualResult(testRatings.toArray))

@@ -42,12 +42,12 @@ class Evaluation {
     recommender.train(trainingData)
 
 
-    val resultFile = Paths.get(s"result/${recommender.getClass.getTypeName}_${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date)}.txt").toFile
+    val resultFile = Paths.get(s"result/${recommender.getParams.getName()}_${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date)}.txt").toFile
     val fw = new FileWriter(resultFile)
 
     logger.info("训练模型完毕，开始进行预测评估")
     val vmean = calulate(testingData, recommender)
-
+    fw.append(recommender.getParams.toString+"\r\n")
     fw.append(s"训练数据：${trainingData.ratings.size}条,测试数据:${testingData.size}\r\n")
     fw.append(s"平均值:$vmean \r\n")
 

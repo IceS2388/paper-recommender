@@ -7,9 +7,9 @@
 object Correlation {
 
   def getCosine(threashold: Int,
-                 userid1: String,
-                 userid2: String,
-                 userHashRatings: Map[String, Seq[Rating]]): Double = {
+                 userid1: Int,
+                 userid2: Int,
+                 userHashRatings: Map[Int, Seq[Rating]]): Double = {
 
     if (!userHashRatings.contains(userid1) || !userHashRatings.contains(userid2)) {
       //不相关
@@ -56,9 +56,9 @@ object Correlation {
     * 增加评分差距因子。2019年7月26日
     **/
   def getPearson(threashold: Int,
-                 userid1: String,
-                 userid2: String,
-                 userHashRatings: Map[String, Seq[Rating]]): Double = {
+                 userid1: Int,
+                 userid2: Int,
+                 userHashRatings: Map[Int, Seq[Rating]]): Double = {
 
     if (!userHashRatings.contains(userid1) || !userHashRatings.contains(userid2)) {
       //不相关
@@ -114,9 +114,9 @@ object Correlation {
   }
 
   def getImprovedPearson(threashold: Int,
-                         userid1: String,
-                         userid2: String,
-                         userHashRatings: Map[String, Seq[Rating]]): Double = {
+                         userid1: Int,
+                         userid2: Int,
+                         userHashRatings: Map[Int, Seq[Rating]]): Double = {
 
     if (!userHashRatings.contains(userid1) || !userHashRatings.contains(userid2)) {
       //不相关
@@ -141,17 +141,16 @@ object Correlation {
 
     //计算平均值和标准差
     val count = comItems.size
-    val sum1 = comItems.map(item => item._2._1).sum
-    val sum2 = comItems.map(item => item._2._2).sum
+    val sum1 = user1Data.map(_.rating).sum
+    val sum2 = user2Data.map(_.rating).sum
 
     //平均值
-    val x_mean = sum1 / count
-    val y_mean = sum2 / count
+    val x_mean = sum1 / user1Data.size
+    val y_mean = sum2 / user2Data.size
 
     //标准差
     var xy = 0D
-    var x_var = 0D
-    var y_var = 0D
+
 
     //偏差因素
     var w = 0.0
@@ -165,9 +164,16 @@ object Correlation {
       val y_vt = i._2._2 - y_mean
       xy += x_vt * y_vt
 
-      x_var += Math.pow(x_vt - x_mean, 2)
-      y_var += Math.pow(y_vt - y_mean, 2)
+      /*x_var += Math.pow(x_vt , 2)
+      y_var += Math.pow(y_vt, 2)*/
     })
+
+    val x_var=user1Data.map(r=>{
+      Math.pow(r.rating-x_mean,2)
+    }).sum
+    val y_var=user2Data.map(r=>{
+      Math.pow(r.rating-y_mean,2)
+    }).sum
 
     //计算偏差指数
     w = Math.pow(Math.E, Math.sqrt(w) * (-1) / count)

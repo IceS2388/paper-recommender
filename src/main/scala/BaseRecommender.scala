@@ -1,3 +1,4 @@
+
 /**
   * Author:IceS
   * Date:2019-08-10 11:15:48
@@ -9,18 +10,20 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.mutable
 
-case class PearsonParams(commonThreashold: Int = 10, numNearestUsers: Int = 100, numUserLikeMovies: Int = 1000) extends Params{
-  override def toString: String = super.toString
+case class BaseParams(method: String = "cosine", commonThreashold: Int = 10, numNearestUsers: Int = 100, numUserLikeMovies: Int = 1000) extends Params {
+  override def toString: String = s"参数：{method:$method,commonThreashold:$commonThreashold,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}"
+
+  override def getName(): String = method
 }
 
-class PearsonRecommender(val ap: PearsonParams) extends Recommender {
+class BaseRecommender(val ap: BaseParams) extends Recommender {
 
-  private var nearestUsers: Map[String, List[(String, Double)]] = _
-  private var usersLikeMovies: Map[String, List[Rating]] = _
-  private var userWatchedItem: Map[String, Seq[Rating]] = _
+  private var nearestUsers: Map[Int, List[(Int, Double)]] = _
+  private var usersLikeMovies: Map[Int, List[Rating]] = _
+  private var userWatchedItem: Map[Int, Seq[Rating]] = _
 
-  @transient private lazy val logger: Logger =LoggerFactory.getLogger(this.getClass)
-
+  @transient private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  override def getParams: Params = ap
   override def train(data: TrainingData): Unit = {
     //验证数据
     require(data.ratings.nonEmpty, "评论数据不能为空！")
@@ -34,20 +37,20 @@ class PearsonRecommender(val ap: PearsonParams) extends Recommender {
 
   }
 
-  private def getUsersLikeMovies(userRatings: Map[String, Seq[Rating]]) = {
+  private def getUsersLikeMovies(userRatings: Map[Int, Seq[Rating]]) = {
     //2.从用户的观看记录中选择用户喜欢的电影,用于后续的用户与用户之间的推荐
-    val userLikesBeyondMean: Map[String, List[Rating]] = userRatings.map(r => {
+    val userLikesBeyondMean = userRatings.map(r => {
 
       //当前用户的平均评分
       val count = r._2.size
-      val mean=r._2.map(_.rating).sum/r._2.size
+      val mean = r._2.map(_.rating).sum / r._2.size
 
       //用户浏览的小于numNearst，全部返回
       val userLikes = if (count < ap.numUserLikeMovies) {
         //排序后，直接返回
         r._2.toList.sortBy(_.rating).reverse
       } else {
-        r._2.filter(r=>r.rating>mean).toList.sortBy(_.rating).reverse.take(ap.numUserLikeMovies)
+        r._2.filter(r => r.rating > mean).toList.sortBy(_.rating).reverse.take(ap.numUserLikeMovies)
       }
       //userLikes.foreach(println)
       //Thread.sleep(1000)
@@ -57,20 +60,38 @@ class PearsonRecommender(val ap: PearsonParams) extends Recommender {
     userLikesBeyondMean
   }
 
-  private def getNearestUsers(userRatings: Map[String, Seq[Rating]]) = {
+  private def getNearestUsers(userRatings: Map[Int, Seq[Rating]]) = {
     //1.获取用户的ID(这里的用户ID，只是包含测试集中的用户ID)
-    val users: Seq[String] = userRatings.keySet.toList.sortBy(_.toInt)
+    val users = userRatings.keySet
 
-    val userNearestPearson = new mutable.HashMap[String, List[(String, Double)]]()
+    val userNearestPearson = new mutable.HashMap[Int, List[(Int, Double)]]()
+
+    val userSimilaryMap = new SimilaryHashMap()
     for {
       u1 <- users
     } {
 
-      val maxPearson: mutable.Map[String, Double] = mutable.HashMap.empty
+      val maxPearson: mutable.Map[Int, Double] = mutable.HashMap.empty
       for {u2 <- users
-           if u1!=u2
+           if u1 != u2
       } {
-        val ps = Correlation.getPearson(ap.commonThreashold, u1, u2, userRatings)
+
+        if (!userSimilaryMap.contains(u1, u2)) {
+
+          val ps = if (ap.method == "cosine") {
+            Correlation.getCosine(ap.commonThreashold, u1, u2, userRatings)
+          } else if (ap.method == "pearson") {
+            Correlation.getPearson(ap.commonThreashold, u1, u2, userRatings)
+          } else if (ap.method == "inprovedpearson") {
+            Correlation.getImprovedPearson(ap.commonThreashold, u1, u2, userRatings)
+          } else {
+            throw new Exception("没有找到对应的方法！")
+          }
+
+          userSimilaryMap.put(u1, u2, ps)
+        }
+        val ps = userSimilaryMap.get(u1, u2)
+
         if (ps > 0) {
           //有用的相似度
           if (maxPearson.size < ap.numNearestUsers) {
@@ -125,7 +146,7 @@ class PearsonRecommender(val ap: PearsonParams) extends Recommender {
 
     //3. 从用户喜欢的电影列表，获取相似度用户看过的电影
     //原先的版本是从用户看过的列表中选择
-    val result= usersLikeMovies.filter(r => {
+    val result = usersLikeMovies.filter(r => {
       // r._1 用户ID
       //3.1 筛选相关用户看过的电影列表
       pUsersMap.contains(r._1)
@@ -139,10 +160,10 @@ class PearsonRecommender(val ap: PearsonParams) extends Recommender {
       //r._1 itemID
       // 3.3 过滤掉用户已经看过的电影
       !userSawMovie.contains(r._1)
-    }).groupBy(_._1).map(r=>{
-      val itemid= r._1
-      val scores= r._2.values.sum
-      (itemid,scores)
+    }).groupBy(_._1).map(r => {
+      val itemid = r._1
+      val scores = r._2.values.sum
+      (itemid, scores)
     })
 
 
@@ -160,5 +181,42 @@ class PearsonRecommender(val ap: PearsonParams) extends Recommender {
     //排序，返回结果
     PredictedResult(returnResult)
   }
+
+
 }
 
+class SimilaryHashMap {
+  private val myMap = new mutable.HashMap[String, Double]()
+
+  def put(u1: Int, u2: Int, score: Double):Unit = {
+    val key1 = s",$u1,$u2,"
+    val key2 = s",$u2,$u1,"
+    if (!myMap.contains(key1) && !myMap.contains(key2)) {
+      myMap.put(key1, score)
+    } else if (myMap.contains(key1)) {
+      myMap.put(key1, score)
+    } else if (myMap.contains(key2)) {
+      myMap.put(key2, score)
+    }
+  }
+
+  def get(u1: Int, u2: Int):Double = {
+    val key1 = s",$u1,$u2,"
+    val key2 = s",$u2,$u1,"
+    if (!myMap.contains(key1) && !myMap.contains(key2)) {
+      throw new Exception(s"没有找到key:$u1 和 $u2 对应的项!")
+    } else if (myMap.contains(key1)) {
+      myMap(key1)
+    } else if (myMap.contains(key2)) {
+      myMap(key2)
+    }else{
+      0D
+    }
+  }
+
+  def contains(u1: Int, u2: Int): Boolean = {
+    val key1 = s",$u1,$u2,"
+    val key2 = s",$u2,$u1,"
+    myMap.contains(key1) || myMap.contains(key2)
+  }
+}
