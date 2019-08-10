@@ -6,28 +6,11 @@ import java.util.Date
 import org.slf4j.{Logger, LoggerFactory}
 
 /**
-  * 为验证的用户评分，Rating类型的数组。
-  * 用户ID
-  * 物品ID
-  * 评分
-  **/
-case class ActualResult(ratings: Array[Rating])
-
-/**
-  * 用户ID和查询数量
-  **/
-case class Query(user: String, num: Int) {
-  override def toString: String = {
-    s"{user:$user,num:$num}"
-  }
-}
-
-/**
   * 验证结果。
   **/
 case class VerifiedResult(precision: Double, recall: Double, f1: Double, exectime: Long) {
   override def toString: String = {
-    s"{precision:%.4f,recall:%.4f,f1:%.4f,exectime:%d}".format(precision,recall,f1,exectime)
+    s"{precision:%.4f,recall:%.4f,f1:%.4f,exectime:%d}".format(precision, recall, f1, exectime)
   }
 
   def +(other: VerifiedResult): VerifiedResult = {
@@ -47,41 +30,34 @@ class Evaluation {
   def run(recommender: Recommender): Unit = {
 
     //: Seq[(TrainingData, Map[Query, ActualResult])]
-    logger.info("这是交叉循环验证：训练集80%，验证集20%")
+    logger.info("训练集80%，验证集20%")
     logger.info("正在进行数据分割处理，需要些时间...")
-    val data = new DataSource().spliteRatings(5, 20)
+    val data = new DataSource().spliteRatings(0.2F, 20)
     logger.info("数据分割完毕")
+
+    val trainingData = data._1
+    val testingData = data._2
+
+    logger.info("训练模型中...")
+    recommender.train(trainingData)
 
 
     val resultFile = Paths.get(s"result/${recommender.getClass.getTypeName}_${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date)}.txt").toFile
     val fw = new FileWriter(resultFile)
 
-    var finalResult = data.map(r => {
-      val trainingData = r._1
-      val testingData = r._2
+    logger.info("训练模型完毕，开始进行预测评估")
+    val vmean = calulate(testingData, recommender)
 
-      logger.info("训练模型中...")
-      recommender.train(trainingData)
-      logger.info("训练模型完毕，开始进行预测评估")
-      val vmean = calulate(testingData, recommender)
+    fw.append(s"训练数据：${trainingData.ratings.size}条,测试数据:${testingData.size}\r\n")
+    fw.append(s"平均值:$vmean \r\n")
 
-      fw.append(s"训练数据：${trainingData.ratings.size}条,测试数据:${testingData.size}\r\n")
-      fw.append(s"$vmean \r\n")
-
-      logger.info("最终的平均结果值")
-      logger.info(vmean.toString)
-
-      vmean
-    }).reduce(_ + _)
-    finalResult = VerifiedResult(finalResult.precision / data.size, finalResult.recall / data.size, finalResult.f1 / data.size, finalResult.exectime / data.size)
-    fw.append(s"最终：$finalResult \r\n")
-
+    logger.info("最终的平均值" + vmean.toString)
     fw.close()
 
 
   }
 
-  private def calulate(testingData: Map[Query, ActualResult], recommender: Recommender): VerifiedResult = {
+  private def calulate(testingData: Seq[(Query, ActualResult)], recommender: Recommender): VerifiedResult = {
     /**
       * P(Predicted)      N(Predicted)
       *
@@ -95,8 +71,6 @@ class Evaluation {
       *
       * F1 = 2TP / (2TP + FP + FN)
       **/
-
-    logger.info("----------------单次结果--------------------")
     logger.info(s"(Query, ActualResult)的数量：${testingData.size}")
     val vsum = testingData.map(r => {
       //计算指标
@@ -128,7 +102,7 @@ class Evaluation {
         //F1 = 2TP / (2TP + FP + FN)
         val f1 = 2.0 * hit / (predictedItems.length + actuallyItems.length)
 
-        //TODO 注释
+
         logger.info(s"user:${r._1.user},命中数量:$hit，样本数量:${r._2.ratings.length}")
         //返回每一个用户ID的验证结果
         val re = VerifiedResult(precision, recall, f1, System.currentTimeMillis() - startTime)

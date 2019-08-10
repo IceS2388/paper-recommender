@@ -9,7 +9,9 @@ import org.slf4j.{Logger, LoggerFactory}
 object App {
   @transient private lazy val logger: Logger =LoggerFactory.getLogger(this.getClass)
   def main(args: Array[String]): Unit = {
-    runPearson()
+
+
+    runCosine()
   }
 
   def runPearson()={
