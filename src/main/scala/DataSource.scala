@@ -47,13 +47,18 @@ class DataSource(dataFilePath: String = "data/ratings.csv") {
 
     Source.fromFile(dataFilePath).getLines().map(line => {
       val data = line.split(",")
-      Rating(data(0), data(1), data(2).toDouble, data(3).toLong)
+      Rating(data(0), data(3), data(1).toDouble, data(2).toLong)
     }).toSeq
   }
 
   def spliteRatings(kFold: Float, topN: Int): (TrainingData, Seq[(Query, ActualResult)]) = {
 
     require(0 < kFold && kFold < 1, "测试集的所占百分比，必须是0至1之间!")
+
+   /* val userRatings=getRatings().groupBy(_.user)
+    userRatings.map(r=>{
+      r.
+    })*/
 
     val ratings = getRatings().zipWithIndex
 
