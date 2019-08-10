@@ -34,19 +34,16 @@ object Correlation {
 
 
     //标准差
-    var xy = 0D
-    var x_var = 0D
-    var y_var = 0D
-
-    comItems.foreach(i => {
+    var xy =comItems.map(i => {
       //         item  u1_rating u2_rating
       //val t: (String, (Double, Double))
+      i._2._1 * i._2._2
+    }).sum
 
-      xy += i._2._1 * i._2._2
+    //2.求分母
+    val x_var=user1Data.map(r=>Math.pow(r.rating,2)).sum
+    val y_var=user2Data.map(r=>Math.pow(r.rating,2)).sum
 
-      x_var += Math.pow(i._2._1, 2)
-      y_var += Math.pow(i._2._2, 2)
-    })
 
     //Cosine系数
     xy / (Math.sqrt(x_var) * Math.sqrt(y_var))
@@ -85,18 +82,15 @@ object Correlation {
     val comItems = comItemSet.map(r => (r, (user1ComData(r), user2ComData(r))))
 
     //计算平均值和标准差
-    val count = comItems.size
-    val sum1 = comItems.map(item => item._2._1).sum
-    val sum2 = comItems.map(item => item._2._2).sum
+    val sum1 = user1Data.map(_.rating).sum
+    val sum2 = user2Data.map(_.rating).sum
 
     //平均值
-    val x_mean = sum1 / count
-    val y_mean = sum2 / count
+    val x_mean = sum1 / user1Data.size
+    val y_mean = sum2 / user2Data.size
 
     //标准差
     var xy = 0D
-    var x_var = 0D
-    var y_var = 0D
 
     comItems.foreach(i => {
       //         item  u1_rating u2_rating
@@ -107,9 +101,13 @@ object Correlation {
       val y_vt = i._2._2 - y_mean
       xy += x_vt * y_vt
 
-      x_var += Math.pow(x_vt - x_mean, 2)
-      y_var += Math.pow(y_vt - y_mean, 2)
     })
+    val x_var=user1Data.map(r=>{
+      Math.pow(r.rating-x_mean,2)
+    }).sum
+    val y_var=user2Data.map(r=>{
+      Math.pow(r.rating-y_mean,2)
+    }).sum
 
     //Pearson系数
     xy / (Math.sqrt(x_var) * Math.sqrt(y_var))

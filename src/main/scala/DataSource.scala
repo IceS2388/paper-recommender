@@ -22,13 +22,13 @@ class TrainingData(val ratings: Seq[Rating]) {
   * Description:
   * 数据源
   */
-class DataSource(dataFilePath: String = "data/ratings.csv") {
+class DataSource(dataFilePath: String = "data/score.txt") {
   @transient lazy val logger: Logger =LoggerFactory.getLogger(this.getClass)
 
   private def getRatings(): Seq[Rating] = {
 
     Source.fromFile(dataFilePath).getLines().map(line => {
-      val data = line.split(",")
+      val data = line.split(" ")
       Rating(data(0), data(1), data(2).toDouble, data(3).toLong)
     }).toSeq
   }
@@ -39,6 +39,8 @@ class DataSource(dataFilePath: String = "data/ratings.csv") {
 
     (0 until kFold).map(idx => {
       logger.info(s"正在进行${idx+1}次数据分割.")
+
+
       //训练集:每条Rating的索引%KFold，若余数不等于当前idx，则添加到训练集
       val trainingRatings = ratings.filter(_._2 % kFold != idx).map(_._1)
       //测试集,若余数等idx则为测试集.

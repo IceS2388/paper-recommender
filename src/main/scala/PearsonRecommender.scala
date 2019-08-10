@@ -1,18 +1,19 @@
+/**
+  * Author:IceS
+  * Date:2019-08-10 11:15:48
+  * Description:
+  * 纯粹的Pearson相似度验证
+  */
+
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.mutable
 
-/**
-  * Author:IceS
-  * Date:2019-08-09 18:57:18
-  * Description:
-  * NONE
-  */
-case class CosineParams(commonThreashold: Int = 1, numNearestUsers: Int = 100, numUserLikeMovies: Int = 1000) extends Params{
-  override def toString: String = ???
+case class PearsonParams(commonThreashold: Int = 10, numNearestUsers: Int = 100, numUserLikeMovies: Int = 1000) extends Params{
+  override def toString: String = super.toString
 }
 
-class CosineRecommender(val ap: CosineParams) extends Recommender {
+class PearsonRecommender(val ap: PearsonParams) extends Recommender {
 
   private var nearestUsers: Map[String, List[(String, Double)]] = _
   private var usersLikeMovies: Map[String, List[Rating]] = _
@@ -39,17 +40,17 @@ class CosineRecommender(val ap: CosineParams) extends Recommender {
 
       //当前用户的平均评分
       val count = r._2.size
+      val mean=r._2.map(_.rating).sum/r._2.size
 
       //用户浏览的小于numNearst，全部返回
       val userLikes = if (count < ap.numUserLikeMovies) {
         //排序后，直接返回
         r._2.toList.sortBy(_.rating).reverse
       } else {
-        r._2.toList.sortBy(_.rating).reverse.take(ap.numUserLikeMovies)
+        r._2.filter(r=>r.rating>mean).toList.sortBy(_.rating).reverse.take(ap.numUserLikeMovies)
       }
-
-      //logger.info(s"user:${r._1} likes Movies Count ${userLikes.count(_=>true)}")
-
+      //userLikes.foreach(println)
+      //Thread.sleep(1000)
       (r._1, userLikes)
     })
 
@@ -67,9 +68,9 @@ class CosineRecommender(val ap: CosineParams) extends Recommender {
 
       val maxPearson: mutable.Map[String, Double] = mutable.HashMap.empty
       for {u2 <- users
-          if u1!=u2
+           if u1!=u2
       } {
-        val ps = Correlation.getCosine(ap.commonThreashold, u1, u2, userRatings)
+        val ps = Correlation.getPearson(ap.commonThreashold, u1, u2, userRatings)
         if (ps > 0) {
           //有用的相似度
           if (maxPearson.size < ap.numNearestUsers) {
@@ -160,3 +161,4 @@ class CosineRecommender(val ap: CosineParams) extends Recommender {
     PredictedResult(returnResult)
   }
 }
+

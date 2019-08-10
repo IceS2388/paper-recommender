@@ -1,3 +1,8 @@
+import java.io.FileWriter
+import java.nio.file.Paths
+import java.text.SimpleDateFormat
+import java.util.Date
+
 import org.slf4j.{Logger, LoggerFactory}
 
 /**
@@ -20,13 +25,13 @@ case class Query(user: String, num: Int) {
 /**
   * 验证结果。
   **/
-case class VerifiedResult(precision: Double, recall: Double, f1: Double) {
+case class VerifiedResult(precision: Double, recall: Double, f1: Double, exectime: Long) {
   override def toString: String = {
-    s"{precision:$precision,recall:$recall,f1:$f1}"
+    s"{precision:%.4f,recall:%.4f,f1:%.4f,exectime:%d}".format(precision,recall,f1,exectime)
   }
 
   def +(other: VerifiedResult): VerifiedResult = {
-    VerifiedResult(this.precision + other.precision, this.recall + other.recall, this.f1 + other.f1)
+    VerifiedResult(this.precision + other.precision, this.recall + other.recall, this.f1 + other.f1, this.exectime + other.exectime)
   }
 }
 
@@ -37,7 +42,7 @@ case class VerifiedResult(precision: Double, recall: Double, f1: Double) {
   * NONE
   */
 class Evaluation {
-  @transient private lazy val logger: Logger =LoggerFactory.getLogger(this.getClass)
+  @transient private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   def run(recommender: Recommender): Unit = {
 
@@ -46,17 +51,32 @@ class Evaluation {
     logger.info("正在进行数据分割处理，需要些时间...")
     val data = new DataSource().spliteRatings(5, 20)
     logger.info("数据分割完毕")
-    //TODO 实现更好的处理方法
-    for ((trainingData, testingData) <- data) {
+
+
+    val resultFile = Paths.get(s"result/${recommender.getClass.getTypeName}_${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date)}.txt").toFile
+    val fw = new FileWriter(resultFile)
+
+    var finalResult = data.map(r => {
+      val trainingData = r._1
+      val testingData = r._2
+
       logger.info("训练模型中...")
       recommender.train(trainingData)
       logger.info("训练模型完毕，开始进行预测评估")
       val vmean = calulate(testingData, recommender)
+
+      fw.append(s"训练数据：${trainingData.ratings.size}条,测试数据:${testingData.size}\r\n")
+      fw.append(s"$vmean \r\n")
+
       logger.info("最终的平均结果值")
       logger.info(vmean.toString)
-      Thread.sleep(1000)
 
-    }
+      vmean
+    }).reduce(_ + _)
+    finalResult = VerifiedResult(finalResult.precision / data.size, finalResult.recall / data.size, finalResult.f1 / data.size, finalResult.exectime / data.size)
+    fw.append(s"最终：$finalResult \r\n")
+
+    fw.close()
 
 
   }
@@ -82,14 +102,20 @@ class Evaluation {
       //计算指标
       logger.info(s"Query：${r._1.user},条数:${r._1.num}")
 
+      val startTime = System.currentTimeMillis()
       val predicts = recommender.predict(r._1)
 
       val actuallyItems = r._2.ratings.map(ar => ar.item)
       val predictedItems = predicts.itemScores.map(ir => ir.item)
+      /*logger.info("实际值")
+      actuallyItems.foreach(println)
+      logger.info("预测值")
+      predictedItems.foreach(println)
+      Thread.sleep(4000)*/
       if (predictedItems.length == 0) {
         //返回每一个用户ID的验证结果
-        val re = VerifiedResult(0, 0, 0)
-        logger.info("没有生成预测列表！样本数量:${r._2.ratings.length}")
+        val re = VerifiedResult(0, 0, 0, System.currentTimeMillis() - startTime)
+        logger.info(s"没有生成预测列表！样本数量:${r._2.ratings.length}")
         logger.info(re.toString)
         re
       } else {
@@ -103,9 +129,9 @@ class Evaluation {
         val f1 = 2.0 * hit / (predictedItems.length + actuallyItems.length)
 
         //TODO 注释
-        logger.info(s"user:${r._1.user},命中数量:${hit}，样本数量:${r._2.ratings.length}")
+        logger.info(s"user:${r._1.user},命中数量:$hit，样本数量:${r._2.ratings.length}")
         //返回每一个用户ID的验证结果
-        val re = VerifiedResult(precision, recall, f1)
+        val re = VerifiedResult(precision, recall, f1, System.currentTimeMillis() - startTime)
         logger.info(re.toString)
         re
       }
@@ -113,7 +139,8 @@ class Evaluation {
 
     VerifiedResult(vsum.precision / testingData.size,
       vsum.recall / testingData.size,
-      vsum.f1 / testingData.size
+      vsum.f1 / testingData.size,
+      vsum.exectime / testingData.size
     )
   }
 }
