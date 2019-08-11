@@ -1,7 +1,6 @@
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.io.Source
-import scala.util.Random
 
 /**
   * 单条评分记录
@@ -11,13 +10,21 @@ case class Rating(user: Int, item: Int, rating: Double, timestamp: Long) {
     s"Rating:{user:$user,item:$item,rating:$rating,timestamp:$timestamp}"
   }
 }
+/**
+  * 数据筛选完毕后的数据
+  * */
+class PrepairedData(val ratings: Seq[Rating]) {
+  override  def toString:String = {
+    s"PrepairedData: [${ratings.size}] (${ratings.take(2).toList}...)"
+  }
+}
 
 /**
   * TrainingData包含所有上面定义的Rating类型数据。
   **/
 class TrainingData(val ratings: Seq[Rating]) {
   override def toString = {
-    s"ratings: [${ratings.size}] (${ratings.take(2).toList}...)"
+    s"TrainingData: [${ratings.size}] (${ratings.take(2).toList}...)"
   }
 }
 
@@ -34,7 +41,7 @@ case class ActualResult(ratings: Array[Rating])
   **/
 case class Query(user: Int, num: Int) {
   override def toString: String = {
-    s"{user:$user,num:$num}"
+    s"Query:{user:$user,num:$num}"
   }
 }
 
@@ -47,7 +54,7 @@ case class Query(user: Int, num: Int) {
 class DataSource(dataFilePath: String = "data/ratings.csv") {
   @transient lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  private def getRatings(): Seq[Rating] = {
+   def getRatings(): Seq[Rating] = {
 
     Source.fromFile(dataFilePath).getLines().map(line => {
       val data = line.toString.trim.split(",")
@@ -56,35 +63,26 @@ class DataSource(dataFilePath: String = "data/ratings.csv") {
     }).toSeq
   }
 
-  def spliteRatings(kFold: Float, topN: Int): (TrainingData, Seq[(Query, ActualResult)]) = {
+  def spliteRatings(kFold: Int, topN: Int,originRatings: PrepairedData): Seq[(TrainingData, Map[Query, ActualResult])] = {
 
-    require(0 < kFold && kFold < 1, "测试集的所占百分比，必须是0至1之间!")
+    val ratings: Seq[(Rating, Int)] = originRatings.ratings.zipWithIndex
+
+    (0 until kFold).map(idx => {
+      logger.info(s"正在进行${idx+1}次数据分割.")
 
 
-    val ratings = getRatings().zipWithIndex
-    /*println(ratings.last)
-    Thread.sleep(1000)*/
+      //训练集:每条Rating的索引%KFold，若余数不等于当前idx，则添加到训练集
+      val trainingRatings = ratings.filter(_._2 % kFold != idx).map(_._1)
+      //测试集,若余数等idx则为测试集.
+      val testingRatings = ratings.filter(_._2 % kFold == idx).map(_._1)
+      //测试集按照用户ID进行分组，便于验证。
+      val testingUsers = testingRatings.groupBy(r => r.user)
+      logger.info(s"训练集大小：${trainingRatings.size},测试集大小：${testingRatings.size}")
+      (new TrainingData(trainingRatings), testingUsers.map {
+        case (user, testRatings) => (Query(user, topN), ActualResult(testRatings.toArray))
+      })
 
-    val trainThreashold = ((1 - kFold) * 100).toInt
-    val trainingData: Seq[(Rating, Int)] = ratings.filter(rating => {
-      val r = Random.nextInt(100)
-      r < trainThreashold
     })
-    val trainIndexs = trainingData.map(_._2).toSet
-
-    logger.info(s"训练集：${trainingData.size},测试集:${ratings.size - trainingData.size}")
-    //trainingData.take(10).foreach(println)
-
-    val testingData: Seq[(Int, Seq[Rating])] = ratings.filter(r => {
-      !trainIndexs.contains(r._2)
-    }).map(_._1).groupBy(_.user).toSeq.sortBy(_._1)
-    //testingData.take(10).foreach(println)
-
-    (new TrainingData(trainingData.map(_._1)), testingData.map {
-      case (user, testRatings) => (Query(user, topN), ActualResult(testRatings.toArray))
-    })
-
-
   }
 
 }

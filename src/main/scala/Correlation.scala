@@ -1,3 +1,5 @@
+import org.apache.spark.mllib.linalg
+
 /**
   * Author:IceS
   * Date:2019-08-09 16:35:58
@@ -5,6 +7,87 @@
   * NONE
   */
 object Correlation {
+
+  //尝试cos相似度
+  def getCosine(v1: linalg.Vector, v2: linalg.Vector): Double = {
+    var sum = 0D
+    var v1Len = 0D
+    var v2Len = 0D
+    for (idx <- 0 until v1.size) {
+      sum += v1.apply(idx) * v2.apply(idx)
+      v1Len += Math.pow(v1.apply(idx), 2)
+      v2Len += Math.pow(v2.apply(idx), 2)
+    }
+    if (v1Len == 0 || v2Len == 0)
+      0D
+    else
+      sum / (Math.sqrt(v1Len * v2Len))
+  }
+
+  /** 改进Pearson算法
+    * r=sum((x-x_mean)*(y-y_mean))/(Math.pow(sum(x-x_mean),0.5)*Math.pow(sum(y-y_mean),0.5))
+    * */
+  def getPearson(v1: linalg.Vector, v2: linalg.Vector): Double = {
+
+    var sum1 = 0D
+    var sum2 = 0D
+    for (idx <- 0 until v1.size) {
+      sum1 += v1.apply(idx)
+      sum2 += v2.apply(idx)
+    }
+    val mean1 = sum1 / v1.size
+    val mean2 = sum2 / v2.size
+    var sum = 0D
+    sum1 = 0
+    sum2 = 0
+    for (idx <- 0 until v1.size) {
+      sum += (v1.apply(idx) - mean1) * (v2.apply(idx) - mean2)
+      sum1 += Math.pow(v1.apply(idx) - mean1,2)
+      sum2 += Math.pow(v2.apply(idx) - mean2,2)
+    }
+    val sum1sum2 = Math.sqrt(sum1 * sum2)
+
+    if (sum1sum2 == 0)
+      0
+    else
+      sum / sum1sum2
+
+  }
+
+  def getImprovedPearson(v1: linalg.Vector, v2: linalg.Vector): Double = {
+    //偏差因子
+    var w=0.0
+
+
+    var sum1 = 0D
+    var sum2 = 0D
+    for (idx <- 0 until v1.size) {
+      sum1 += v1.apply(idx)
+      sum2 += v2.apply(idx)
+
+      w+=Math.pow(v1.apply(idx)-v2.apply(idx),2)
+    }
+    val mean1 = sum1 / v1.size
+    val mean2 = sum2 / v2.size
+    var sum = 0D
+    sum1 = 0
+    sum2 = 0
+    for (idx <- 0 until v1.size) {
+      sum += (v1.apply(idx) - mean1) * (v2.apply(idx) - mean2)
+      sum1 += Math.pow(v1.apply(idx) - mean1,2)
+      sum2 += Math.pow(v2.apply(idx) - mean2,2)
+    }
+    val sum1sum2 = Math.sqrt(sum1 * sum2)
+
+    //计算偏差指数
+    w = Math.pow(Math.E,Math.sqrt(w)*(-1)/v1.size)
+
+    if (sum1sum2 == 0)
+      0
+    else
+      sum / sum1sum2 *w
+
+  }
 
   def getCosine(threashold: Int,
                  userid1: Int,

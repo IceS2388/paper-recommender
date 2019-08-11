@@ -11,7 +11,7 @@
 /**
   * 物品的ID和评分
   */
-case class ItemScore(item: Int,score: Double) {
+case class ItemScore(item: Int, score: Double) {
   override def toString: String = {
     s"item:$item,score:$score"
   }
@@ -26,16 +26,22 @@ case class PredictedResult(itemScores: Array[ItemScore]) {
   }
 }
 
-trait Params{
-  def getName():String
+trait Params {
+  def getName(): String
 }
+
 case class EmptyParams() extends Params {
   override def toString(): String = "Empty"
 
   override def getName(): String = this.getName()
 }
-abstract class Recommender{
-   def train(data:TrainingData):Unit
-   def predict(query: Query): PredictedResult
-  def getParams:Params
+
+abstract class Recommender {
+  def getParams: Params
+
+  def prepare(data: Seq[Rating]): PrepairedData
+
+  def train(data: TrainingData): Unit
+
+  def predict(query: Query): PredictedResult
 }

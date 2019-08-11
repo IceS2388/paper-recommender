@@ -10,10 +10,10 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.mutable
 
-case class BaseParams(method: String = "cosine", commonThreashold: Int = 10, numNearestUsers: Int = 100, numUserLikeMovies: Int = 1000) extends Params {
+case class BaseParams(method: String = "Cosine", commonThreashold: Int = 5, numNearestUsers: Int = 100, numUserLikeMovies: Int = 1000) extends Params {
   override def toString: String = s"参数：{method:$method,commonThreashold:$commonThreashold,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}"
 
-  override def getName(): String = method
+  override def getName(): String = s"${this.getClass.getSimpleName.replace("Params","")}_$method"
 }
 
 class BaseRecommender(val ap: BaseParams) extends Recommender {
@@ -23,7 +23,14 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
   private var userWatchedItem: Map[Int, Seq[Rating]] = _
 
   @transient private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
+
+  /** 保存结果时使用 */
   override def getParams: Params = ap
+
+  override def prepare(data: Seq[Rating]): PrepairedData = {
+    new PrepairedData(data)
+  }
+
   override def train(data: TrainingData): Unit = {
     //验证数据
     require(data.ratings.nonEmpty, "评论数据不能为空！")
@@ -78,11 +85,11 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
 
         if (!userSimilaryMap.contains(u1, u2)) {
 
-          val ps = if (ap.method == "cosine") {
+          val ps = if (ap.method.toLowerCase() == "cosine") {
             Correlation.getCosine(ap.commonThreashold, u1, u2, userRatings)
-          } else if (ap.method == "pearson") {
+          } else if (ap.method.toLowerCase() == "pearson") {
             Correlation.getPearson(ap.commonThreashold, u1, u2, userRatings)
-          } else if (ap.method == "inprovedpearson") {
+          } else if (ap.method.toLowerCase() == "inprovedpearson") {
             Correlation.getImprovedPearson(ap.commonThreashold, u1, u2, userRatings)
           } else {
             throw new Exception("没有找到对应的方法！")
@@ -188,7 +195,7 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
 class SimilaryHashMap {
   private val myMap = new mutable.HashMap[String, Double]()
 
-  def put(u1: Int, u2: Int, score: Double):Unit = {
+  def put(u1: Int, u2: Int, score: Double): Unit = {
     val key1 = s",$u1,$u2,"
     val key2 = s",$u2,$u1,"
     if (!myMap.contains(key1) && !myMap.contains(key2)) {
@@ -200,7 +207,7 @@ class SimilaryHashMap {
     }
   }
 
-  def get(u1: Int, u2: Int):Double = {
+  def get(u1: Int, u2: Int): Double = {
     val key1 = s",$u1,$u2,"
     val key2 = s",$u2,$u1,"
     if (!myMap.contains(key1) && !myMap.contains(key2)) {
@@ -209,7 +216,7 @@ class SimilaryHashMap {
       myMap(key1)
     } else if (myMap.contains(key2)) {
       myMap(key2)
-    }else{
+    } else {
       0D
     }
   }

@@ -10,7 +10,7 @@ import org.slf4j.{Logger, LoggerFactory}
   **/
 case class VerifiedResult(precision: Double, recall: Double, f1: Double, exectime: Long) {
   override def toString: String = {
-    s"{precision:%.4f,recall:%.4f,f1:%.4f,exectime:%d}".format(precision, recall, f1, exectime)
+    s"准确率:%.4f,召回率:%.4f,f1:%.4f,时间:%d(ms)".format(precision, recall, f1, exectime)
   }
 
   def +(other: VerifiedResult): VerifiedResult = {
@@ -30,29 +30,60 @@ class Evaluation {
   def run(recommender: Recommender): Unit = {
 
     //: Seq[(TrainingData, Map[Query, ActualResult])]
-    logger.info("训练集80%，验证集20%")
+    val ds=new DataSource()
+    logger.info("读取所有数据，并进行初始处理。")
+    val preparedData=recommender.prepare(ds.getRatings())
+    logger.info("划分数据，训练集80%，验证集20%")
     logger.info("正在进行数据分割处理，需要些时间...")
-    val data = new DataSource().spliteRatings(0.2F, 20)
+    val data = ds.spliteRatings(5,20,preparedData)
     logger.info("数据分割完毕")
 
-    val trainingData = data._1
-    val testingData = data._2
-
-    logger.info("训练模型中...")
-    recommender.train(trainingData)
-
-
     val resultFile = Paths.get(s"result/${recommender.getParams.getName()}_${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date)}.txt").toFile
+
     val fw = new FileWriter(resultFile)
 
-    logger.info("训练模型完毕，开始进行预测评估")
-    val vmean = calulate(testingData, recommender)
-    fw.append(recommender.getParams.toString+"\r\n")
-    fw.append(s"训练数据：${trainingData.ratings.size}条,测试数据:${testingData.size}\r\n")
-    fw.append(s"平均值:$vmean \r\n")
+    var finalResult = data.map(r => {
+      val trainingData = r._1
+      val testingData = r._2.toSeq
 
-    logger.info("最终的平均值" + vmean.toString)
+      logger.info("训练模型中...")
+      recommender.train(trainingData)
+      logger.info("训练模型完毕，开始进行预测评估")
+
+      val vmean = calulate(testingData, recommender)
+
+      fw.append(s"训练数据：${trainingData.ratings.size}条,测试数据:${testingData.map(_._2.ratings.length).sum}条，用户数量：${testingData.size} \r\n")
+      fw.append(s"$vmean \r\n")
+
+      logger.info("终值"+vmean.toString+"\r\n")
+
+      vmean
+    }).reduce(_ + _)
+
+    finalResult = VerifiedResult(finalResult.precision / data.size, finalResult.recall / data.size, finalResult.f1 / data.size, finalResult.exectime / data.size)
+
+    fw.append(s"最终：$finalResult \r\n")
     fw.close()
+
+
+    /* val trainingData = data._1
+     val testingData = data._2
+
+     logger.info("训练模型中...")
+     recommender.train(trainingData)
+
+
+     val resultFile = Paths.get(s"result/${recommender.getParams.getName()}_${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date)}.txt").toFile
+     val fw = new FileWriter(resultFile)
+
+     logger.info("训练模型完毕，开始进行预测评估")
+     val vmean = calulate(testingData, recommender)
+     fw.append(recommender.getParams.toString+"\r\n")
+     fw.append(s"训练数据：${trainingData.ratings.size}条,测试数据:${testingData.size}\r\n")
+     fw.append(s"平均值:$vmean \r\n")
+
+     logger.info("最终的平均值" + vmean.toString)
+     fw.close()*/
 
 
   }
