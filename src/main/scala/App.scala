@@ -10,14 +10,22 @@ object App {
   @transient private lazy val logger: Logger =LoggerFactory.getLogger(this.getClass)
   def main(args: Array[String]): Unit = {
 
-    runCluster()
+    runHot()
+    //runCluster()
     //runInprovedPearson()
     //runPearson()
     //runCosine()
   }
 
+  def runHot():Unit={
+    val ap=new HotParams()
+    val recommender=new HotRecommender(ap)
+    val eval=new Evaluation()
+    eval.run(recommender)
+  }
+
   def runCluster():Unit={
-    val ap=new ClusterParams()
+    val ap=new ClusterParams(method = "Pearson")
     val recommender=new ClusterRecommender(ap)
     val eval=new Evaluation()
     eval.run(recommender)

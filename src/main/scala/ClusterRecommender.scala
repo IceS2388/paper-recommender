@@ -24,6 +24,8 @@ case class ClusterParams(
   override def getName(): String = {
     this.getClass.getSimpleName.replace("Params", "") + s"_$method"
   }
+
+  override def toString: String = s"聚类参数{userThreashold:$userThreashold,itemThreashold:$itemThreashold,method:$method,k:$k,maxIterations:$maxIterations,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}\r\n"
 }
 
 

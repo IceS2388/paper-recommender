@@ -41,6 +41,7 @@ class Evaluation {
     val resultFile = Paths.get(s"result/${recommender.getParams.getName()}_${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date)}.txt").toFile
 
     val fw = new FileWriter(resultFile)
+    fw.append(recommender.getParams.toString)
 
     var finalResult = data.map(r => {
       val trainingData = r._1

@@ -1,4 +1,3 @@
-
 /**
   * Author:IceS
   * Date:2019-08-10 11:15:48
@@ -11,9 +10,9 @@ import org.slf4j.{Logger, LoggerFactory}
 import scala.collection.mutable
 
 case class BaseParams(method: String = "Cosine", commonThreashold: Int = 5, numNearestUsers: Int = 100, numUserLikeMovies: Int = 1000) extends Params {
-  override def toString: String = s"参数：{method:$method,commonThreashold:$commonThreashold,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}"
+  override def toString: String = s"参数：{method:$method,commonThreashold:$commonThreashold,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}\r\n"
 
-  override def getName(): String = s"${this.getClass.getSimpleName.replace("Params","")}_$method"
+  override def getName(): String = s"${this.getClass.getSimpleName.replace("Params", "")}_$method"
 }
 
 class BaseRecommender(val ap: BaseParams) extends Recommender {
@@ -53,12 +52,8 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
       val mean = r._2.map(_.rating).sum / r._2.size
 
       //用户浏览的小于numNearst，全部返回
-      val userLikes = if (count < ap.numUserLikeMovies) {
-        //排序后，直接返回
-        r._2.toList.sortBy(_.rating).reverse
-      } else {
-        r._2.filter(r => r.rating > mean).toList.sortBy(_.rating).reverse.take(ap.numUserLikeMovies)
-      }
+      val userLikes = r._2.filter(r => r.rating > mean).toList.sortBy(_.rating).reverse.take(ap.numUserLikeMovies)
+
       //userLikes.foreach(println)
       //Thread.sleep(1000)
       (r._1, userLikes)
@@ -101,16 +96,7 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
 
         if (ps > 0) {
           //有用的相似度
-          if (maxPearson.size < ap.numNearestUsers) {
-            maxPearson.put(u2, ps)
-          } else {
-            val min_p = maxPearson.map(r => (r._1, r._2)).minBy(r => r._2)
-            if (ps > min_p._2) {
-              maxPearson.remove(min_p._1)
-              maxPearson.put(u2, ps)
-            }
-
-          }
+          maxPearson.put(u2, ps)
         }
       }
       /*logger.info(s"训练:$u1 , ${maxPearson.size}")
@@ -135,14 +121,20 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
 
     //2.获取当前用户的Pearson值最大的用户列表
     //2.1 判断有没有列表
-    val similaryUers = nearestUsers.filter(r => r._1 == query.user)
+    val similaryUers: Map[Int, List[(Int, Double)]] = nearestUsers.filter(r => r._1 == query.user)
     if (similaryUers.isEmpty) {
       //该用户没有最相似的Pearson用户列表
       logger.warn(s"该用户:${query.user}没有cosine相似用户列表，无法生成推荐！")
       return PredictedResult(Array.empty)
     }
 
-    val pUsersMap = similaryUers.flatMap(r => r._2)
+    //返回当前用户的相似用户和相似度
+    val pUsersMap: Map[Int, Double] = similaryUers.map(r => {
+      val uid = r._1
+      //uid
+      val nearestUser = r._2.sortBy(_._2).reverse.take(ap.numNearestUsers)
+      (uid, nearestUser)
+    }).flatMap(_._2)
 
     /*logger.info(s"相似度用户数量为:${similaryUers.size}，组成的未筛选的列表为:${pUsersMap.size}")
     Thread.sleep(1000)*/
@@ -156,7 +148,7 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
     val result = usersLikeMovies.filter(r => {
       // r._1 用户ID
       //3.1 筛选相关用户看过的电影列表
-      pUsersMap.contains(r._1)
+      pUsersMap.nonEmpty && pUsersMap.contains(r._1)
     }).flatMap(r => {
       //r: (String, Iterable[Rating])
       //3.2 生成每一个item的积分
@@ -169,7 +161,7 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
       !userSawMovie.contains(r._1)
     }).groupBy(_._1).map(r => {
       val itemid = r._1
-      val scores = r._2.values.sum
+      val scores = r._2.values.sum[Double]
       (itemid, scores)
     })
 
@@ -179,7 +171,7 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
 
 
     //logger.info(s"生成的Pearson相似度的长度为：${result.count()}")
-    val weight = 1.0
+    val weight = 1.0D
     val returnResult = result.map(r => {
       ItemScore(r._1, r._2 / sum * weight)
     }).toArray.sortBy(_.score).reverse.take(query.num)
