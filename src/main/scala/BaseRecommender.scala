@@ -86,6 +86,10 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
             Correlation.getPearson(ap.commonThreashold, u1, u2, userRatings)
           } else if (ap.method.toLowerCase() == "inprovedpearson") {
             Correlation.getImprovedPearson(ap.commonThreashold, u1, u2, userRatings)
+          } else if (ap.method.toLowerCase() == "jaccard") {
+            Correlation.getJaccard(ap.commonThreashold, u1, u2, userRatings.map(r=>{
+              (r._1,r._2.map(_.item).toSet)
+            }))
           } else {
             throw new Exception("没有找到对应的方法！")
           }
@@ -124,9 +128,10 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
     val similaryUers: Map[Int, List[(Int, Double)]] = nearestUsers.filter(r => r._1 == query.user)
     if (similaryUers.isEmpty) {
       //该用户没有最相似的Pearson用户列表
-      logger.warn(s"该用户:${query.user}没有cosine相似用户列表，无法生成推荐！")
+      logger.warn(s"该用户:${query.user}没有${ap.method}相似用户列表，无法生成推荐！")
       return PredictedResult(Array.empty)
     }
+    logger.info(s"当前用户的相似度用户数量为：${similaryUers(query.user).size}")
 
     //返回当前用户的相似用户和相似度
     val pUsersMap: Map[Int, Double] = similaryUers.map(r => {
@@ -135,6 +140,7 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
       val nearestUser = r._2.sortBy(_._2).reverse.take(ap.numNearestUsers)
       (uid, nearestUser)
     }).flatMap(_._2)
+    logger.info(s"相似度用户的物品数量为：${pUsersMap.size}")
 
     /*logger.info(s"相似度用户数量为:${similaryUers.size}，组成的未筛选的列表为:${pUsersMap.size}")
     Thread.sleep(1000)*/
@@ -164,13 +170,13 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
       val scores = r._2.values.sum[Double]
       (itemid, scores)
     })
-
+    logger.info(s"生成物品列表的数量为：${result.size}")
 
     val sum: Double = result.values.sum
     if (sum == 0) return PredictedResult(Array.empty)
 
 
-    //logger.info(s"生成的Pearson相似度的长度为：${result.count()}")
+    logger.info(s"生成的${ap.method}相似度的长度为：${result.size}")
     val weight = 1.0D
     val returnResult = result.map(r => {
       ItemScore(r._1, r._2 / sum * weight)

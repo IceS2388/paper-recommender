@@ -8,6 +8,8 @@ import org.apache.spark.mllib.linalg
   */
 object Correlation {
 
+
+
   //尝试cos相似度
   def getCosine(v1: linalg.Vector, v2: linalg.Vector): Double = {
     var sum = 0D
@@ -87,6 +89,29 @@ object Correlation {
     else
       sum / sum1sum2 *w
 
+  }
+
+  def getJaccard(threashold: Int,
+                 key1: Int,
+                 key2: Int,
+                 hashItems: Map[Int, Set[Int]]): Double ={
+    if (!hashItems.contains(key1) || !hashItems.contains(key2)) {
+      //不相关
+      return 0D
+    }
+
+    val user1Data= hashItems(key1)
+    val user2Data = hashItems(key2)
+
+    //1.求u1与u2共同的物品ID
+    val comItemSet = user1Data.intersect(user2Data)
+
+    if (comItemSet.size < threashold) {
+      //小于共同物品的阀值，直接退出
+      return 0D
+    }
+
+    comItemSet.size*1.0/(user1Data.size+user2Data.size-comItemSet.size)
   }
 
   def getCosine(threashold: Int,

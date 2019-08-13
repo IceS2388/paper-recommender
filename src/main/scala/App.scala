@@ -10,11 +10,22 @@ object App {
   @transient private lazy val logger: Logger =LoggerFactory.getLogger(this.getClass)
   def main(args: Array[String]): Unit = {
 
-    runHot()
-    //runCluster()
-    //runInprovedPearson()
-    //runPearson()
+    runSAR()
+    //runJaccard()
     //runCosine()
+    //runPearson()
+    //runInprovedPearson()
+    //runHot()
+    //runClusterPearson()
+    //runClusterCosine()
+    //runClusterImprovedPearson()
+  }
+
+  def runSAR():Unit={
+    val ap=new SARParams()
+    val recommender=new SARRecommender(ap)
+    val eval=new Evaluation()
+    eval.run(recommender)
   }
 
   def runHot():Unit={
@@ -23,8 +34,20 @@ object App {
     val eval=new Evaluation()
     eval.run(recommender)
   }
+  def runClusterImprovedPearson():Unit={
+    val ap=new ClusterParams(method = "ImprovedPearson")
+    val recommender=new ClusterRecommender(ap)
+    val eval=new Evaluation()
+    eval.run(recommender)
+  }
+  def runClusterCosine():Unit={
+    val ap=new ClusterParams(method = "Cosine")
+    val recommender=new ClusterRecommender(ap)
+    val eval=new Evaluation()
+    eval.run(recommender)
+  }
 
-  def runCluster():Unit={
+  def runClusterPearson():Unit={
     val ap=new ClusterParams(method = "Pearson")
     val recommender=new ClusterRecommender(ap)
     val eval=new Evaluation()
@@ -33,6 +56,13 @@ object App {
 
   def runInprovedPearson():Unit={
     val ap=new BaseParams(method = "InprovedPearson")
+    val recommender=new BaseRecommender(ap)
+    val eval=new Evaluation()
+    eval.run(recommender)
+  }
+
+  def runJaccard():Unit={
+    val ap=new BaseParams(method = "Jaccard")
     val recommender=new BaseRecommender(ap)
     val eval=new Evaluation()
     eval.run(recommender)

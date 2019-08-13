@@ -35,10 +35,11 @@ class Evaluation {
     val preparedData=recommender.prepare(ds.getRatings())
     logger.info("划分数据，训练集80%，验证集20%")
     logger.info("正在进行数据分割处理，需要些时间...")
-    val data = ds.spliteRatings(5,20,preparedData)
+    val topN=10
+    val data = ds.spliteRatings(5,topN,preparedData)
     logger.info("数据分割完毕")
 
-    val resultFile = Paths.get(s"result/${recommender.getParams.getName()}_${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date)}.txt").toFile
+    val resultFile = Paths.get(s"result/${recommender.getParams.getName()}_${topN}_${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date)}.txt").toFile
 
     val fw = new FileWriter(resultFile)
     fw.append(recommender.getParams.toString)
