@@ -1,48 +1,37 @@
+/**
+  * Author:IceS
+  * Date:2019-08-18 07:52:37
+  * Description:
+  * NONE
+  */
+
 import org.apache.spark.mllib.clustering.BisectingKMeans
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.regression.LabeledPoint
+import org.apache.spark.mllib.tree.RandomForest
+import org.apache.spark.mllib.tree.model.RandomForestModel
 import org.apache.spark.sql.SparkSession
-import org.deeplearning4j.nn.api.OptimizationAlgorithm
-import org.deeplearning4j.nn.conf.NeuralNetConfiguration
-import org.deeplearning4j.nn.conf.graph.MergeVertex
-import org.deeplearning4j.nn.conf.layers.{DenseLayer, OutputLayer}
-import org.deeplearning4j.nn.graph.ComputationGraph
-import org.nd4j.linalg.activations.Activation
-import org.nd4j.linalg.api.ndarray.INDArray
-import org.nd4j.linalg.factory.Nd4j
 import org.slf4j.{Logger, LoggerFactory}
 
 
-
-
-/**
-  * Author:IceS
-  * Date:2019-08-12 19:10:11
-  * Description:
-  * 著名的神经网络协同过滤模型
-  * 1.编码转换，根据评分向量，直接作为稀疏向量。
-  * 用户ID  索引   评分
-  * userid:itemid,rating
-  * 2.聚类.
-  * 3.根据中心点，生成新的用户(物品)特征向量
-  * 4.根据新的特征向量，搭建神经网络。
-  *
-  *
-  */
-// TODO 用随机森林测试
-case class NCFParams(userThreashold: Int = 20,
-                     itemThreashold: Int = 2,
-                     method: String = "Cosine",
+case class RandomForestParams(
                      k: Int = 5,
-                     maxIterations: Int = 20) extends Params {
+                     maxIterations: Int = 20,
+                     numClass: Int = 10,
+                     numTrees: Int = 5,
+                     featureSubsetStrategy: String = "auto",
+                     impurity: String = "gini",
+                     maxDepth: Int = 5,
+                     maxBins: Int = 100) extends Params {
   override def getName(): String = this.getClass.getSimpleName.replace("Params", "")
 
   override def toString: String = {
-    s"${this.getClass.getSimpleName}:{userThreashold:$userThreashold,itemThreashold:$itemThreashold,method:$method,k:$k,maxIterations:$maxIterations\r\n"
+    s"${this.getClass.getSimpleName}:{k:$k,maxIterations:$maxIterations,numClass:$numClass,numTrees:$numTrees,featureSubsetStrategy:$featureSubsetStrategy,impurity:$impurity,maxDepth:$maxDepth,maxBins:$maxBins}\r\n"
   }
 }
 
-class NCFRecommender(ap: NCFParams) extends Recommender {
+class RandomForestRecommender(ap: RandomForestParams) extends Recommender {
 
   @transient private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
   override def getParams: Params = ap
@@ -127,83 +116,47 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
       (r._1, fdistance)
     })
 
-    sparkSession.close()
-
-    //3.搭建神经网络
-    //配置网络结构
-    val computationGraphConf = new NeuralNetConfiguration.Builder()
-      .seed(123)
-      .activation(Activation.SIGMOID)
-      .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
-      .updater(new org.nd4j.linalg.learning.config.AdaDelta())
-      .l2(1e-3)
-      .graphBuilder()
-      .addInputs("input")
-      .addLayer("GML", new DenseLayer.Builder().nIn(2*ap.k).nOut(1).build(), "input")
-      .addLayer("MLP4", new DenseLayer.Builder().nIn(2*ap.k).nOut(4 * (2*ap.k)).build(), "input")
-      .addLayer("MLP2", new DenseLayer.Builder().nIn(4 * (2*ap.k)).nOut(2 * (2*ap.k)).build(), "MLP4")
-      .addLayer("MLP1", new DenseLayer.Builder().nIn(2 * (2*ap.k)).nOut(2*ap.k).build(), "MLP2")
-      .addVertex("ncf", new MergeVertex(), "GML", "MLP1")
-      .addLayer("out",new OutputLayer.Builder().nIn(2*ap.k+1).nOut(10).build(),"ncf")
-      .setOutputs("out")
-      .build()
-
-    import org.deeplearning4j.nn.graph.ComputationGraph
-    model = new ComputationGraph(computationGraphConf)
-    model.init()
-
-    //准备训练数据
-    val td = trainingData.ratings.map(r => {
-      //构建数据
-      val userV = newUserVector(r.user)
-      val itemV = newItemVector(r.item)
-      val arr = new Array[Float](userV.length + itemV.length)
+    //建立随机森林模型
+    //3.2 处理处理数据格式
+    val dt= trainingData.ratings.map(r => {
+      val userV=newUserVector(r.user)
+      val itemV=newItemVector(r.item)
+      val arr = new Array[Double](userV.length + itemV.length)
 
       userV.indices.foreach(idx => {
-        arr(idx) = userV(idx).toFloat
+        arr(idx) = userV(idx)
       })
 
       itemV.indices.foreach(idx => {
-        arr(idx + userV.length) = itemV(idx).toFloat
+        arr(idx + userV.length) = itemV(idx)
       })
-
-      //生成标签
-      val la=new Array[Float](10)
-      if(r.rating==0.5)
-        la(0)=1
-      else if(r.rating==1.0)
-        la(1)=1
-      else if(r.rating==1.5)
-        la(2)=1
-      else if(r.rating==2.0)
-        la(3)=1
-      else if(r.rating==2.5)
-        la(4)=1
-      else if(r.rating==3.0)
-        la(5)=1
-      else if(r.rating==3.5)
-        la(6)=1
-      else if(r.rating==4.0)
-        la(7)=1
-      else if(r.rating==4.5)
-        la(8)=1
-      else if(r.rating==5.0)
-        la(9)=1
-      else
-        throw new Exception("评分错误!")
-
-      (Nd4j.create(arr).reshape(1,10), Nd4j.create(la).reshape(1,10))
+      LabeledPoint(r.rating,Vectors.dense(arr))
     })
 
-    td.foreach(r=>{
+    //3.3 准备模型参数
 
-      model.fit(Array(r._1),Array( r._2))
-    })
-    //model.fit(td.map(_._1).toArray,td.map(_._2).toArray)
+    //设定输入数据格式
+    val categoricalFeaturesInfo = Map[Int, Int]()
+
+
+     model = RandomForest.trainClassifier(
+      sparkSession.sparkContext.parallelize(dt),
+      ap.numClass,
+      categoricalFeaturesInfo,
+      ap.numTrees,
+      ap.featureSubsetStrategy.toLowerCase(),
+      ap.impurity.toLowerCase(),
+      ap.maxDepth,
+      ap.maxBins)
+
+
+    //sparkSession.close()
+
+
 
   }
 
-  private var model: ComputationGraph = _
+  private var model: RandomForestModel = _
   //训练集中用户所拥有item
   private var userHasItem: Map[Int, Seq[Rating]] = _
 
@@ -227,32 +180,24 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
 
     //根据当前用户的ID和物品列表生成预测集
     val userV =newUserVector(query.user)//用户特征向量
-    val result = items.filter(r=>{
+    val result= items.filter(r=>{
       newItemVector.contains(r)
     }).map(r=>{
 
       val itemV =newItemVector(r)
-      val arr = new Array[Float](userV.length + itemV.length)
+      val arr = new Array[Double](userV.length + itemV.length)
       userV.indices.foreach(idx => {
-        arr(idx) = userV(idx).toFloat
+        arr(idx) = userV(idx)
       })
 
       itemV.indices.foreach(idx => {
-        arr(idx + userV.length) = itemV(idx).toFloat
+        arr(idx + userV.length) = itemV(idx)
       })
 
-      val vs: Array[INDArray] =model.output(Nd4j.create(arr).reshape(1,10))
-      //logger.info(s"vs.length:${vs.length},vs(0).length:${vs(0).length()}")
-
-      val scores=vs(0).getFloat(9)*5.0+vs(0).getFloat(8)*4.5+vs(0).getFloat(7)*4.0+vs(0).getFloat(6)*3.5
-
-      ItemScore(r, scores)
+      ItemScore(r, model.predict(Vectors.dense(arr)))
     }).toArray.sortBy(_.score).reverse.take(query.num)
 
-    /*result.foreach(r=>{
-      logger.info(s"itemID:${r._1},Array:${r._2}")
-      r._2.foreach(println)
-    })*/
+
     PredictedResult(result)
 
   }

@@ -292,4 +292,15 @@ object Correlation {
     //改良过后的相似度计算方法
     pearson * w
   }
+
+  //获取两个点之间的距离
+  def getDistance(v1: linalg.Vector,v2:linalg.Vector): Double ={
+    val len=Math.max(v1.size,v2.size)
+    var distance=0D
+    for(i <- 0 until len){
+      distance+=Math.pow(v1.apply(i)-v2.apply(i),2)
+    }
+
+    Math.sqrt(distance)
+  }
 }
