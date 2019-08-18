@@ -12,6 +12,8 @@ import org.nd4j.linalg.api.ndarray.INDArray
 import org.nd4j.linalg.factory.Nd4j
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.util.Random
+
 
 
 
@@ -29,7 +31,6 @@ import org.slf4j.{Logger, LoggerFactory}
   *
   *
   */
-// TODO 用随机森林测试
 case class NCFParams(userThreashold: Int = 20,
                      itemThreashold: Int = 2,
                      method: String = "Cosine",
@@ -144,7 +145,7 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
       .addLayer("MLP2", new DenseLayer.Builder().nIn(4 * (2*ap.k)).nOut(2 * (2*ap.k)).build(), "MLP4")
       .addLayer("MLP1", new DenseLayer.Builder().nIn(2 * (2*ap.k)).nOut(2*ap.k).build(), "MLP2")
       .addVertex("ncf", new MergeVertex(), "GML", "MLP1")
-      .addLayer("out",new OutputLayer.Builder().nIn(2*ap.k+1).nOut(10).build(),"ncf")
+      .addLayer("out",new OutputLayer.Builder().nIn(2*ap.k+1).nOut(2).build(),"ncf")
       .setOutputs("out")
       .build()
 
@@ -153,8 +154,14 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
     model.init()
 
     //准备训练数据
-    val td = trainingData.ratings.map(r => {
-      //构建数据
+    //1.获取所有训练集中的物品
+    val allItemsSet=trainingData.ratings.map(_.item).distinct.toSet
+
+    val size= trainingData.ratings.size
+    //2.正样本数据
+    logger.info("正样本数据")
+    val positiveData: Seq[(Int,INDArray, INDArray)] = trainingData.ratings.map(r => {
+      //构建特征数据
       val userV = newUserVector(r.user)
       val itemV = newItemVector(r.item)
       val arr = new Array[Float](userV.length + itemV.length)
@@ -168,38 +175,67 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
       })
 
       //生成标签
-      val la=new Array[Float](10)
-      if(r.rating==0.5)
-        la(0)=1
-      else if(r.rating==1.0)
-        la(1)=1
-      else if(r.rating==1.5)
-        la(2)=1
-      else if(r.rating==2.0)
-        la(3)=1
-      else if(r.rating==2.5)
-        la(4)=1
-      else if(r.rating==3.0)
-        la(5)=1
-      else if(r.rating==3.5)
-        la(6)=1
-      else if(r.rating==4.0)
-        la(7)=1
-      else if(r.rating==4.5)
-        la(8)=1
-      else if(r.rating==5.0)
-        la(9)=1
-      else
-        throw new Exception("评分错误!")
+      val la=new Array[Float](2)
+      la(0)=0
+      la(1)=1
 
-      (Nd4j.create(arr).reshape(1,10), Nd4j.create(la).reshape(1,10))
+      (Random.nextInt(size), Nd4j.create(arr).reshape(1,10), Nd4j.create(la).reshape(1,2))
+    })
+    //3.负样本数据
+    logger.info("负样本数据")
+   val negativeData: Seq[(Int,INDArray, INDArray)] = userGroup.flatMap(r=>{
+      val userHadSet=r._2.map(_.item).distinct.toSet
+      val negativeSet=allItemsSet.diff(userHadSet)
+      val nSet= Random.shuffle(negativeSet).take(100)
+
+      val userV = newUserVector(r._1)
+
+      nSet.map(itemID=>{
+        val itemV = newItemVector(itemID)
+        val arr = new Array[Float](userV.length + itemV.length)
+
+        userV.indices.foreach(idx => {
+          arr(idx) = userV(idx).toFloat
+        })
+
+        itemV.indices.foreach(idx => {
+          arr(idx + userV.length) = itemV(idx).toFloat
+        })
+
+        //生成标签
+        val la=new Array[Float](2)
+        la(0)=1
+        la(1)=0
+        (Random.nextInt(size),Nd4j.create(arr).reshape(1,10), Nd4j.create(la).reshape(1,2))
+      })
+    }).toSeq
+
+    //数据打散
+    logger.info("数据打散")
+    val trainTempData=new Array[(Int,INDArray, INDArray)](positiveData.size+negativeData.size)
+    var idx=0
+    positiveData.foreach(r=>{
+      trainTempData(idx)=r
+      idx+=1
     })
 
-    td.foreach(r=>{
+    negativeData.foreach(r=>{
+      trainTempData(idx)=r
+      idx+=1
+    })
+
+   val finalData= trainTempData.sortBy(_._1).map(r=>{
+      (r._2,r._3)
+    })
+
+    //训练模型
+    logger.info("开始训练模型...")
+    finalData.foreach(r=>{
 
       model.fit(Array(r._1),Array( r._2))
     })
-    //model.fit(td.map(_._1).toArray,td.map(_._2).toArray)
+    logger.info("训练模型完成")
+
 
   }
 
@@ -227,6 +263,7 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
 
     //根据当前用户的ID和物品列表生成预测集
     val userV =newUserVector(query.user)//用户特征向量
+    var logN=0
     val result = items.filter(r=>{
       newItemVector.contains(r)
     }).map(r=>{
@@ -244,15 +281,16 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
       val vs: Array[INDArray] =model.output(Nd4j.create(arr).reshape(1,10))
       //logger.info(s"vs.length:${vs.length},vs(0).length:${vs(0).length()}")
 
-      val scores=vs(0).getFloat(9)*5.0+vs(0).getFloat(8)*4.5+vs(0).getFloat(7)*4.0+vs(0).getFloat(6)*3.5
+      val scores=vs(0).getFloat(1)
+      if(logN<10){
+        logger.info(s"item:${r},scores:${scores},vs(0).getFloat(0):${vs(0).getFloat(0)}")
+        logN+=1
+      }
 
       ItemScore(r, scores)
     }).toArray.sortBy(_.score).reverse.take(query.num)
 
-    /*result.foreach(r=>{
-      logger.info(s"itemID:${r._1},Array:${r._2}")
-      r._2.foreach(println)
-    })*/
+
     PredictedResult(result)
 
   }

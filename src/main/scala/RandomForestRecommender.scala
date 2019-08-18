@@ -130,6 +130,7 @@ class RandomForestRecommender(ap: RandomForestParams) extends Recommender {
       itemV.indices.foreach(idx => {
         arr(idx + userV.length) = itemV(idx)
       })
+      //修改，并返回概率才行
       LabeledPoint(r.rating,Vectors.dense(arr))
     })
 
