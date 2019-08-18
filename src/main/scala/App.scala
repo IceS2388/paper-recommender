@@ -9,7 +9,7 @@ import org.slf4j.{Logger, LoggerFactory}
 object App {
   @transient private lazy val logger: Logger =LoggerFactory.getLogger(this.getClass)
   def main(args: Array[String]): Unit = {
-
+    //runNCFCluster()
     //runRandomForest()
     runNCF()
     //runSAR()
@@ -21,6 +21,13 @@ object App {
     //runClusterPearson()
     //runClusterCosine()
     //runClusterImprovedPearson()
+  }
+
+  def runNCFCluster():Unit={
+    val ap=new NCFClusterParams()
+    val recommender=new NCFClusterRecommender(ap)
+    val eval=new Evaluation()
+    eval.run(recommender)
   }
 
   def runRandomForest():Unit={

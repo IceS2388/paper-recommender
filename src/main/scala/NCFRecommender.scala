@@ -186,6 +186,7 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
    val negativeData: Seq[(Int,INDArray, INDArray)] = userGroup.flatMap(r=>{
       val userHadSet=r._2.map(_.item).distinct.toSet
       val negativeSet=allItemsSet.diff(userHadSet)
+     //保证负样本的数量，和正样本数量一致
       val nSet= Random.shuffle(negativeSet).take(100)
 
       val userV = newUserVector(r._1)
@@ -230,8 +231,12 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
 
     //训练模型
     logger.info("开始训练模型...")
+    var logIdx:Int=0
     finalData.foreach(r=>{
-
+      if(logIdx%100==0){
+        logger.info(s"index:$logIdx")
+      }
+      logIdx+=1
       model.fit(Array(r._1),Array( r._2))
     })
     logger.info("训练模型完成")
@@ -282,8 +287,8 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
       //logger.info(s"vs.length:${vs.length},vs(0).length:${vs(0).length()}")
 
       val scores=vs(0).getFloat(1)
-      if(logN<10){
-        logger.info(s"item:${r},scores:${scores},vs(0).getFloat(0):${vs(0).getFloat(0)}")
+      if(logN<2){
+        logger.info(s"itemID:${r},正样例率:$scores,负样例率:${vs(0).getFloat(0)}")
         logN+=1
       }
 

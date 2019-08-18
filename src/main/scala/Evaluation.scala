@@ -56,6 +56,7 @@ class Evaluation {
 
       fw.append(s"训练数据：${trainingData.ratings.size}条,测试数据:${testingData.map(_._2.ratings.length).sum}条，用户数量：${testingData.size} \r\n")
       fw.append(s"$vmean \r\n")
+      fw.flush()
 
       logger.info("终值"+vmean.toString+"\r\n")
 

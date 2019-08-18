@@ -153,8 +153,6 @@ class RandomForestRecommender(ap: RandomForestParams) extends Recommender {
 
     //sparkSession.close()
 
-
-
   }
 
   private var model: RandomForestModel = _
