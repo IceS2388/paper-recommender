@@ -10,8 +10,8 @@ object App {
   @transient private lazy val logger: Logger =LoggerFactory.getLogger(this.getClass)
   def main(args: Array[String]): Unit = {
     //runNCFCluster()
-    //runRandomForest()
-    runNCF()
+    runRandomClusterForest()
+    //runNCF()
     //runSAR()
     //runJaccard()
     //runCosine()
@@ -30,14 +30,16 @@ object App {
     eval.run(recommender)
   }
 
-  def runRandomForest():Unit={
-    val ap=new RandomForestParams()
-    val recommender=new RandomForestRecommender(ap)
+  def runRandomClusterForest():Unit={
+
+    val ap=new RandomForestClusterParams()
+    val recommender=new RandomForestClusterRecommender(ap)
     val eval=new Evaluation()
     eval.run(recommender)
   }
 
   def runNCF():Unit={
+    //单纯的NCF2分类
     val ap=new NCFParams()
     val recommender=new NCFRecommender(ap)
     val eval=new Evaluation()
