@@ -9,18 +9,61 @@ import org.slf4j.{Logger, LoggerFactory}
 object App {
   @transient private lazy val logger: Logger =LoggerFactory.getLogger(this.getClass)
   def main(args: Array[String]): Unit = {
+
+    runBase()
     //runNCFCluster()
-    runRandomClusterForest()
+    //runRandomClusterForest()
     //runNCF()
     //runSAR()
-    //runJaccard()
-    //runCosine()
-    //runPearson()
-    //runInprovedPearson()
+
     //runHot()
     //runClusterPearson()
     //runClusterCosine()
     //runClusterImprovedPearson()
+  }
+
+  def runBase():Unit={
+    //1.生成参数列表
+    val args=List(
+      //余弦相似度
+      // numUserLikeMovies测试
+      //new BaseParams(commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
+      //new BaseParams(commonThreashold=2,numNearestUsers=5,numUserLikeMovies=10),
+      //new BaseParams(commonThreashold=2,numNearestUsers=5,numUserLikeMovies=20),
+      //new BaseParams(commonThreashold=2,numNearestUsers=5,numUserLikeMovies=40),
+      //new BaseParams(commonThreashold=2,numNearestUsers=5,numUserLikeMovies=80),
+      //numNearestUsers测试
+      new BaseParams(commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
+      new BaseParams(commonThreashold=2,numNearestUsers=10,numUserLikeMovies=5),
+      new BaseParams(commonThreashold=2,numNearestUsers=20,numUserLikeMovies=5),
+      new BaseParams(commonThreashold=2,numNearestUsers=40,numUserLikeMovies=5),
+      new BaseParams(commonThreashold=2,numNearestUsers=80,numUserLikeMovies=5)
+
+    )
+    for( arg <- args){
+      val recommender=new BaseRecommender(arg)
+      val eval=new Evaluation()
+      eval.run(recommender)
+    }
+  }
+
+  def runCluster():Unit={
+    //1.生成参数列表
+    val args=List(
+      //余弦相似度
+      // numUserLikeMovies测试
+      new ClusterParams(numNearestUsers=5,numUserLikeMovies=5),
+      new ClusterParams(numNearestUsers=5,numUserLikeMovies=10),
+      new ClusterParams(numNearestUsers=5,numUserLikeMovies=20),
+      new ClusterParams(numNearestUsers=5,numUserLikeMovies=40),
+      new ClusterParams(numNearestUsers=5,numUserLikeMovies=80)
+
+    )
+    for( arg <- args){
+      val recommender=new ClusterRecommender(arg)
+      val eval=new Evaluation()
+      eval.run(recommender)
+    }
   }
 
   def runNCFCluster():Unit={
@@ -59,51 +102,7 @@ object App {
     val eval=new Evaluation()
     eval.run(recommender)
   }
-  def runClusterImprovedPearson():Unit={
-    val ap=new ClusterParams(method = "ImprovedPearson")
-    val recommender=new ClusterRecommender(ap)
-    val eval=new Evaluation()
-    eval.run(recommender)
-  }
-  def runClusterCosine():Unit={
-    val ap=new ClusterParams(method = "Cosine")
-    val recommender=new ClusterRecommender(ap)
-    val eval=new Evaluation()
-    eval.run(recommender)
-  }
 
-  def runClusterPearson():Unit={
-    val ap=new ClusterParams(method = "Pearson")
-    val recommender=new ClusterRecommender(ap)
-    val eval=new Evaluation()
-    eval.run(recommender)
-  }
 
-  def runInprovedPearson():Unit={
-    val ap=new BaseParams(method = "InprovedPearson")
-    val recommender=new BaseRecommender(ap)
-    val eval=new Evaluation()
-    eval.run(recommender)
-  }
 
-  def runJaccard():Unit={
-    val ap=new BaseParams(method = "Jaccard")
-    val recommender=new BaseRecommender(ap)
-    val eval=new Evaluation()
-    eval.run(recommender)
-  }
-
-  def runPearson():Unit={
-    val ap=new BaseParams(method = "Pearson")
-    val recommender=new BaseRecommender(ap)
-    val eval=new Evaluation()
-    eval.run(recommender)
-  }
-
-  def runCosine():Unit={
-    val ap=new BaseParams()
-    val recommender=new BaseRecommender(ap)
-    val eval=new Evaluation()
-    eval.run(recommender)
-  }
 }

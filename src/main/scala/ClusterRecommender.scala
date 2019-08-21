@@ -352,7 +352,8 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
       //logger.info(s"累加的相似度：${scores},物品的评论数量:${itemCountSeq(r._1)}")
       (itemid, scores+itemCountSeq(r._1))
     })
-    logger.info(s"生成的推荐列表的长度:${result.size}")
+
+    logger.info(s"生成候选物品列表的长度为：${result.size}")
     val sum: Double = result.values.sum
     if (sum == 0) return PredictedResult(Array.empty)
 
@@ -368,48 +369,4 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
 
 }
 
-/**
-  * 这个类的目的是为了减少相似度的计算
-  **/
-class NearestUserAccumulator {
-  private val mapAccumulator = mutable.Map[String, Double]()
 
-  def containsKey(k1: Int, k2: Int): Boolean = {
-    val key1 = s",$k1,$k2,"
-    val key2 = s",$k2,$k1,"
-    mapAccumulator.contains(key1) || mapAccumulator.contains(key2)
-  }
-
-
-  def add(v: (Int, Int, Double)): Unit = {
-    val u1 = v._1
-    val u2 = v._2
-    val score = v._3
-    if (!this.containsKey(u1, u2)) {
-      val key = s",$u1,$u2,"
-      mapAccumulator += key -> score
-    } else {
-      val key1 = s",$u1,$u2,"
-      val key2 = s",$u2,$u1,"
-      if (mapAccumulator.contains(key1)) {
-        mapAccumulator.put(key1, score)
-      } else if (mapAccumulator.contains(key2)) {
-        mapAccumulator.put(key2, score)
-      }
-    }
-
-  }
-
-  def add(v: (String, Double)): Unit = {
-    val key = v._1
-    val value = v._2
-    if (!mapAccumulator.contains(key))
-      mapAccumulator += key -> value
-    else
-      mapAccumulator.put(key, value)
-  }
-
-  def value: mutable.Map[String, Double] = {
-    mapAccumulator
-  }
-}

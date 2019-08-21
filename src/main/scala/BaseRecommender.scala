@@ -87,15 +87,18 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
           } else if (ap.method.toLowerCase() == "inprovedpearson") {
             Correlation.getImprovedPearson(ap.commonThreashold, u1, u2, userRatings)
           } else if (ap.method.toLowerCase() == "jaccard") {
-            Correlation.getJaccard(ap.commonThreashold, u1, u2, userRatings.map(r=>{
-              (r._1,r._2.map(_.item).toSet)
+            Correlation.getJaccard(ap.commonThreashold, u1, u2, userRatings.map(r => {
+              (r._1, r._2.map(_.item).toSet)
             }))
+          } else if (ap.method.toLowerCase() == "jaccardmsd") {
+            Correlation.getJaccardMSD(ap.commonThreashold, u1, u2, userRatings)
           } else {
             throw new Exception("没有找到对应的方法！")
           }
 
           userSimilaryMap.put(u1, u2, ps)
         }
+
         val ps = userSimilaryMap.get(u1, u2)
 
         if (ps > 0) {
@@ -176,7 +179,7 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
     if (sum == 0) return PredictedResult(Array.empty)
 
 
-    logger.info(s"生成的${ap.method}相似度的长度为：${result.size}")
+    logger.info(s"生成候选物品列表的长度为：${result.size}")
     val weight = 1.0D
     val returnResult = result.map(r => {
       ItemScore(r._1, r._2 / sum * weight)
