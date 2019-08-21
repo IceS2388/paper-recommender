@@ -35,25 +35,14 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
   private var afterClusterRDD: Seq[(Int, (Int, linalg.Vector))] = _
   //训练集中用户所拥有item
   private var userHasItem: Map[Int, Seq[Rating]] = _
-  //每个用户所有的物品
-  private var allUserItemSet: Map[Int, Set[Int]] = _
+
 
   override def prepare(data: Seq[Rating]): PrepairedData = {
 
     require(data.nonEmpty, "原始数据不能为空！")
 
-    allUserItemSet = data.groupBy(_.user).map(r => {
-      val userId = r._1
-      //
-      val itemSet = r._2.map(_.item).toSet
-      (userId, itemSet)
-    })
-    //数据分割前
-
     new PrepairedData(data)
   }
-
-
 
   override def train(data: TrainingData): Unit = {
 
@@ -107,9 +96,8 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
     /** -------------------对用户评分向量进行聚类--------------------- **/
     logger.info("正在对用户评分向量进行聚类，需要些时间...")
     //3.准备聚类
-
-
     val sparkSession = SparkSession.builder().master("local[*]").appName(this.getClass.getSimpleName).getOrCreate()
+
     val bkm = new BisectingKMeans().setK(ap.k).setMaxIterations(ap.maxIterations)
     //val model = bkm.run(userVectorsRDD.map(_._2))
     val d =sparkSession.sparkContext.parallelize(userVectors)

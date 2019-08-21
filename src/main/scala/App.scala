@@ -41,9 +41,10 @@ object App {
       //BaseParams(commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
       //BaseParams(commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5)
       //Cosine总结：最优参数 commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5
+      //准确率:0.1276,召回率:0.0703,f1:0.0728,时间:1(ms)
 
       //AdjustCosine
-      // numUserLikeMovies测试 结论：5最高
+      //numUserLikeMovies测试 结论：5最高
       //BaseParams(method = "AdjustCosine",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
       //BaseParams(method = "AdjustCosine",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=10),
       //BaseParams(method = "AdjustCosine",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=20),
@@ -55,13 +56,13 @@ object App {
       //BaseParams(method = "AdjustCosine",commonThreashold=2,numNearestUsers=20,numUserLikeMovies=5),
       //BaseParams(method = "AdjustCosine",commonThreashold=2,numNearestUsers=40,numUserLikeMovies=5),
       //BaseParams(method = "AdjustCosine",commonThreashold=2,numNearestUsers=80,numUserLikeMovies=5)
-      //commonThreashold 结论：2最佳
+      //commonThreashold 结论：5最佳
       //BaseParams(method = "AdjustCosine",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
       //BaseParams(method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5),
       //BaseParams(method = "AdjustCosine",commonThreashold=10,numNearestUsers=5,numUserLikeMovies=5),
-      //BaseParams(method = "AdjustCosine",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
-      //BaseParams(method = "AdjustCosine",commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5)
-      // TODO Jaccard总结：最优参数 commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5
+      BaseParams(method = "AdjustCosine",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
+      BaseParams(method = "AdjustCosine",commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5)
+      // TODO AdjustCosine总结：最优参数 commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5
 
       //Jaccard相似度
       // numUserLikeMovies测试 结论：5最高
@@ -83,7 +84,28 @@ object App {
       //BaseParams(method = "Jaccard",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
       //BaseParams(method = "Jaccard",commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5)
       //Jaccard总结：最优参数 commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5
-      //相似度不如Cosine高
+      //准确率:0.1166,召回率:0.0725,f1:0.0746,时间:3(ms)
+
+      //JaccardMSD相似度
+      // numUserLikeMovies测试 结论：5最高
+      //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
+      //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=10),
+      //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=20),
+      //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=40),
+      //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=80)
+      //numNearestUsers测试 结论:5最高
+      //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
+      //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=10,numUserLikeMovies=5),
+      //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=20,numUserLikeMovies=5),
+      //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=40,numUserLikeMovies=5),
+      //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=80,numUserLikeMovies=5)
+      //commonThreashold 结论：2最佳
+      //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
+      //BaseParams(method = "JaccardMSD",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5),
+      //BaseParams(method = "JaccardMSD",commonThreashold=10,numNearestUsers=5,numUserLikeMovies=5),
+      //BaseParams(method = "JaccardMSD",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
+      //BaseParams(method = "JaccardMSD",commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5)
+      //TODO
 
       //Pearson
       // numUserLikeMovies测试 结论：5最高
@@ -93,18 +115,19 @@ object App {
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=40),
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=80)
       //numNearestUsers测试 结论:5最高
-      BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
-      BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=10,numUserLikeMovies=5),
-      BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=20,numUserLikeMovies=5),
-      BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=40,numUserLikeMovies=5),
-      BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=80,numUserLikeMovies=5)
-      //commonThreashold 结论：2最佳
+      //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
+      //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=10,numUserLikeMovies=5),
+      //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=20,numUserLikeMovies=5),
+      //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=40,numUserLikeMovies=5),
+      //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=80,numUserLikeMovies=5)
+      //commonThreashold 结论：20最高
       //BaseParams(method = "Pearson",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
       //BaseParams(method = "Pearson",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5),
       //BaseParams(method = "Pearson",commonThreashold=10,numNearestUsers=5,numUserLikeMovies=5),
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
       //BaseParams(method = "Pearson",commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5)
-      //TODO 测试
+      //Pearson总结：最优参数 commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5
+      //准确率:0.0596,召回率:0.0200,f1:0.0258,时间:2(ms)
 
       //ImprovedPearson相似度
       // numUserLikeMovies测试 结论：5最高
@@ -126,6 +149,7 @@ object App {
       //BaseParams(method = "ImprovedPearson",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
       //BaseParams(method = "ImprovedPearson",commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5)
       //ImprovedPearson总结：最优参数 commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5
+      //准确率:0.0596,召回率:0.0202,f1:0.0260,时间:4(ms)
     )
     for( arg <- args){
       val recommender=new BaseRecommender(arg)
