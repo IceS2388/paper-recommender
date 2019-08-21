@@ -84,15 +84,16 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
             Correlation.getCosine(ap.commonThreashold, u1, u2, userRatings)
           } else if (ap.method.toLowerCase() == "pearson") {
             Correlation.getPearson(ap.commonThreashold, u1, u2, userRatings)
-          } else if (ap.method.toLowerCase() == "inprovedpearson") {
+          } else if (ap.method.toLowerCase() == "improvedpearson") {
             Correlation.getImprovedPearson(ap.commonThreashold, u1, u2, userRatings)
           } else if (ap.method.toLowerCase() == "jaccard") {
-            Correlation.getJaccard(ap.commonThreashold, u1, u2, userRatings.map(r => {
-              (r._1, r._2.map(_.item).toSet)
-            }))
+            Correlation.getJaccard(ap.commonThreashold, u1, u2, userRatings)
           } else if (ap.method.toLowerCase() == "jaccardmsd") {
             Correlation.getJaccardMSD(ap.commonThreashold, u1, u2, userRatings)
-          } else {
+          }else if(ap.method.toLowerCase()=="adjustcosine"){
+            Correlation.getAdjustCosine(ap.commonThreashold, u1, u2, userRatings)
+          }
+          else {
             throw new Exception("没有找到对应的方法！")
           }
 
