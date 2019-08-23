@@ -1,3 +1,5 @@
+package recommender
+
 import java.io.FileWriter
 import java.nio.file.Paths
 import java.text.SimpleDateFormat
@@ -5,18 +7,6 @@ import java.util.Date
 
 import org.slf4j.{Logger, LoggerFactory}
 
-/**
-  * 验证结果。
-  **/
-case class VerifiedResult(precision: Double, recall: Double, f1: Double, exectime: Long) {
-  override def toString: String = {
-    s"准确率:%.4f,召回率:%.4f,f1:%.4f,时间:%d(ms)".format(precision, recall, f1, exectime)
-  }
-
-  def +(other: VerifiedResult): VerifiedResult = {
-    VerifiedResult(this.precision + other.precision, this.recall + other.recall, this.f1 + other.f1, this.exectime + other.exectime)
-  }
-}
 
 /**
   * Author:IceS
@@ -30,16 +20,16 @@ class Evaluation {
   def run(recommender: Recommender): Unit = {
 
     //: Seq[(TrainingData, Map[Query, ActualResult])]
-    val ds=new DataSource()
+    val ds = new DataSource()
     logger.info("读取所有数据，并进行初始处理。")
-    val preparedData=recommender.prepare(ds.getRatings())
+    val preparedData = recommender.prepare(ds.getRatings())
     logger.info("划分数据，训练集80%，验证集20%")
     logger.info("正在进行数据分割处理，需要些时间...")
-    val topN=10
-    val data = ds.spliteRatings(5,topN,preparedData)
+    val topN = 10
+    val data = ds.splitRatings(5, topN, preparedData)
     logger.info("数据分割完毕")
 
-    val resultFile = Paths.get(s"result/${recommender.getParams.getName()}_${topN}_${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date)}.txt").toFile
+    val resultFile = Paths.get(s"result/${recommender.getParams.getName()}_${topN}_${new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date)}.txt").toFile
 
     val fw = new FileWriter(resultFile)
     fw.append(recommender.getParams.toString)
@@ -58,7 +48,7 @@ class Evaluation {
       fw.append(s"$vmean \r\n")
       fw.flush()
 
-      logger.info("终值"+vmean.toString+"\r\n")
+      logger.info("终值" + vmean.toString + "\r\n")
 
       vmean
     }).reduce(_ + _)

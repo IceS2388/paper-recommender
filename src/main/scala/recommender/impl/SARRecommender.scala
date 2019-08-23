@@ -1,5 +1,8 @@
+package recommender.impl
+
 import breeze.linalg.DenseMatrix
 import org.slf4j.{Logger, LoggerFactory}
+import recommender.tools.BiMap
 
 /**
   * Author:IceS

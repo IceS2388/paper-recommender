@@ -1,3 +1,5 @@
+package recommender.impl
+
 import org.slf4j.{Logger, LoggerFactory}
 
 /**

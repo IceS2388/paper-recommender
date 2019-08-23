@@ -1,3 +1,5 @@
+package recommender.tools
+
 import scala.collection.immutable.HashMap
 
 /**
@@ -11,7 +13,7 @@ class BiMap[K, V](
                    private val i: Option[BiMap[V, K]] = None
                  ) extends Serializable {
 
-  // NOTE: make inverse's inverse point back to current BiMap
+  // NOTE: make inverse's inverse point back to current recommender.tools.BiMap
   val inverse: BiMap[V, K] = i.getOrElse {
     val rev = m.map(_.swap)
     require(rev.size == m.size,
@@ -50,11 +52,11 @@ object BiMap {
 
   def apply[K, V](x: Map[K, V]): BiMap[K, V] = new BiMap(x)
 
-  /** Create a BiMap[Int, Long] from a set of Int. The Int index starts
+  /** Create a recommender.tools.BiMap[Int, Long] from a set of Int. The Int index starts
     * from 0.
     *
     * @param keys a set of Int
-    * @return a Int to Long BiMap
+    * @return a Int to Long recommender.tools.BiMap
     */
   def toIndex(keys: Set[Int]): BiMap[Int, Long] = {
     val hm = HashMap(keys.toSeq.zipWithIndex.map(t => (t._1, t._2.toLong)): _*)

@@ -1,3 +1,5 @@
+package recommender.impl
+
 import org.apache.spark.mllib.clustering.BisectingKMeans
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.Vectors
@@ -11,6 +13,7 @@ import org.nd4j.linalg.activations.Activation
 import org.nd4j.linalg.api.ndarray.INDArray
 import org.nd4j.linalg.factory.Nd4j
 import org.slf4j.{Logger, LoggerFactory}
+import recommender.tools.BiMap
 
 import scala.util.Random
 

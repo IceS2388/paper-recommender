@@ -1,8 +1,11 @@
-import org.apache.spark.mllib.clustering.BisectingKMeans
+package recommender.impl
+
+import org.apache.spark.mllib.clustering.{BisectingKMeans, GaussianMixture, KMeans}
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.sql.SparkSession
 import org.slf4j.{Logger, LoggerFactory}
+import recommender.tools.NearestUserAccumulator
 
 import scala.collection.mutable
 
@@ -13,16 +16,17 @@ import scala.collection.mutable
   * 这个类的重点是测试聚类算法
   */
 case class ClusterParams(
-                          method: String = "Cosine",
-                          k: Int = 5,
+                          clusterMethod: String = "BisectingKMeans",
+                          k: Int = 2,
                           maxIterations: Int = 20,
-                          numNearestUsers: Int = 60,
-                          numUserLikeMovies: Int = 100) extends Params {
+                          method: String = "Cosine",
+                          numNearestUsers: Int = 5,
+                          numUserLikeMovies: Int = 5) extends Params {
   override def getName(): String = {
-    this.getClass.getSimpleName.replace("Params", "") + s"_$method"
+    this.getClass.getSimpleName.replace("Params", "") + s"_$clusterMethod"
   }
 
-  override def toString: String = s"聚类参数{method:$method,k:$k,maxIterations:$maxIterations,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}\r\n"
+  override def toString: String = s"聚类{聚类方法：$clusterMethod,簇心数量:$k,maxIterations:$maxIterations,相似度方法:$method,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}\r\n"
 }
 
 
@@ -47,49 +51,35 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
   override def train(data: TrainingData): Unit = {
 
     require(data.ratings.nonEmpty, "训练数据不能为空！")
+    require(Set("BisectingKMeans", "K-means", "GaussianMixture").contains(ap.clusterMethod), "聚类方法必须在是：[BisectingKMeans,K-means,GaussianMixture]其中之一!")
 
     //1.获取训练集中每个用户的观看列表
     userHasItem = data.ratings.groupBy(_.user)
 
     //实现新的统计方法
-   val userVectors= userHasItem.map(r=>{
-      val uid=r._1
-      var c1=0D //0.5
-      var c2=0D //1.0
-      var c3=0D //1.5
-      var c4=0D //2.0
-      var c5=0D //2.5
-      var c6=0D //3.0
-      var c7=0D //3.5
-      var c8=0D //4.0
-      var c9=0D //4.5
-      var c10=0D  //5.0
+    val userVectors = userHasItem.map(r => {
+      val uid = r._1
+      var c1 = 0D //1.0
+      var c2 = 0D //2.0
+      var c3 = 0D //3.0
+      var c4 = 0D //4.0
+      var c5 = 0D //5.0
 
-      r._2.foreach(r2=>{
-        if(r2.rating==0.5)
-          c1+=1
-        else if(r2.rating==1.0)
-          c2+=1
-        else if(r2.rating==1.5)
-          c3+=1
-        else if(r2.rating==2.0)
-          c4+=1
-        else if(r2.rating==2.5)
-          c5+=1
-        else if(r2.rating==3.0)
-          c6+=1
-        else if(r2.rating==3.5)
-          c7+=1
-        else if(r2.rating==4.0)
-          c8+=1
-        else if(r2.rating==4.5)
-          c9+=1
+      r._2.foreach(r2 => {
+        if (r2.rating == 1.0)
+          c1 += 1
+        else if (r2.rating == 2.0)
+          c2 += 1
+        else if (r2.rating == 3.0)
+          c3 += 1
+        else if (r2.rating == 4.0)
+          c4 += 1
         else
-          c10+=1
+          c5 += 1
       })
       //归一化
-      val count=r._2.size
-      (uid,Vectors.dense(c1/count,c2/count,c3/count,c4/count,c5/count,c6/count,c7/count,c8/count,c9/count,c10/count))
+      val count = r._2.size
+      (uid, Vectors.dense(c1 / count, c2 / count, c3 / count, c4 / count, c5 / count))
     }).toSeq
 
 
@@ -98,16 +88,57 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
     //3.准备聚类
     val sparkSession = SparkSession.builder().master("local[*]").appName(this.getClass.getSimpleName).getOrCreate()
 
-    val bkm = new BisectingKMeans().setK(ap.k).setMaxIterations(ap.maxIterations)
-    //val model = bkm.run(userVectorsRDD.map(_._2))
-    val d =sparkSession.sparkContext.parallelize(userVectors)
-    val model=bkm.run(d.map(_._2))
+    val d = sparkSession.sparkContext.parallelize(userVectors)
+    val dtrain = d.map(_._2)
+
+    //选择聚类算法
+    if (ap.clusterMethod.toLowerCase() == "BisectingKMeans".toLowerCase) {
+      val bkm = new BisectingKMeans().setK(ap.k).setMaxIterations(ap.maxIterations)
+      val model = bkm.run(dtrain)
+
+      /*//调试信息
+      //查看集合内偏差的误差平方和
+      //数据集内偏差的误差平方和：47.21731266112625
+      val WSSSE = model.computeCost(dtrain)
+      logger.info(s"数据集内偏差的误差平方和：$WSSSE")
+      throw new Exception("集群偏差测试")*/
+
+      afterClusterRDD = userVectors.map(r => {
+        (model.predict(r._2), r)
+      })
+    } else if (ap.clusterMethod.toLowerCase() == "K-means".toLowerCase) {
+      val clusters = KMeans.train(dtrain, ap.k, ap.maxIterations)
+
+      /*//调试信息
+      //查看集合内偏差的误差平方和
+      val WSSSE = clusters.computeCost(dtrain)
+      logger.info(s"数据集内偏差的误差平方和：$WSSSE")
+      Thread.sleep(5000)*/
+
+
+      afterClusterRDD = userVectors.map(r => {
+        (clusters.predict(r._2), r)
+      })
+    } else if (ap.clusterMethod.toLowerCase() == "GaussianMixture".toLowerCase()) {
+      val gmm = new GaussianMixture().setK(ap.k).run(dtrain)
+
+      //调试信息
+      //查看集合内偏差的误差平方和
+      for (i <- 0 until gmm.k) {
+        println("weight=%f\nmu=%s\nsigma=\n%s\n" format
+          (gmm.weights(i), gmm.gaussians(i).mu, gmm.gaussians(i).sigma))
+      }
+      //Thread.sleep(5000)
+
+      afterClusterRDD = userVectors.map(r => {
+        (gmm.predict(r._2), r)
+      })
+    }
+
 
 
     //4.聚类用户评分向量(族ID,评分向量),根据聚类计算用户之间的相似度使用
-    afterClusterRDD = userVectors.map(r => {
-      (model.predict(r._2), r)
-    })
+
 
     /** -------------------生成共享数据--------------------- **/
 
@@ -217,8 +248,8 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
       flatMap(_._2).
       //过滤已经看过的
       filter(r => {
-        currentUserSawSet.nonEmpty && !currentUserSawSet.contains(r.item)
-      }).
+      currentUserSawSet.nonEmpty && !currentUserSawSet.contains(r.item)
+    }).
       map(r => {
         //评分乘以相似度
         //r.rating

@@ -1,3 +1,5 @@
+package recommender.tools
+
 import scala.collection.mutable
 
 /**
