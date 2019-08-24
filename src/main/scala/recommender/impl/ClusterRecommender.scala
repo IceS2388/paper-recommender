@@ -5,7 +5,8 @@ import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.sql.SparkSession
 import org.slf4j.{Logger, LoggerFactory}
-import recommender.tools.NearestUserAccumulator
+import recommender._
+import recommender.tools.{Correlation, NearestUserAccumulator}
 
 import scala.collection.mutable
 

@@ -1,6 +1,7 @@
 package recommender.impl
 
 import org.slf4j.{Logger, LoggerFactory}
+import recommender._
 
 /**
   * Author:IceS
@@ -8,13 +9,13 @@ import org.slf4j.{Logger, LoggerFactory}
   * Description:
   * 作为对比，热榜推荐。
   */
-case class HotParams() extends Params{
-  override def getName(): String = this.getClass.getSimpleName.replace("Params","")
+case class HotParams() extends Params {
+  override def getName(): String = this.getClass.getSimpleName.replace("Params", "")
 
-  override def toString: String = this.getName()+"\r\n"
+  override def toString: String = this.getName() + "\r\n"
 }
 
-class HotRecommender(ap:HotParams) extends Recommender {
+class HotRecommender(ap: HotParams) extends Recommender {
 
   @transient private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
@@ -24,15 +25,16 @@ class HotRecommender(ap:HotParams) extends Recommender {
     new PrepairedData(data)
   }
 
-  private var hotestItems: Array[(Int, Int)]=_
+  private var hotestItems: Array[(Int, Int)] = _
 
   private var userHasItem: Map[Int, Seq[Rating]] = _
+
   override def train(data: TrainingData): Unit = {
     //1.生成热榜
-    hotestItems = data.ratings.groupBy(_.item).map(r=>{
+    hotestItems = data.ratings.groupBy(_.item).map(r => {
       //r._1//Int item
       //r._2.size//评论
-      (r._1,r._2.size)
+      (r._1, r._2.size)
     }).toArray.sortBy(_._2).reverse
 
     //2.生成用户观看列表
@@ -51,7 +53,7 @@ class HotRecommender(ap:HotParams) extends Recommender {
       currentUserSawSet.nonEmpty && !currentUserSawSet.contains(r._1)
     }).take(query.num)
     logger.info(s"生成的推荐列表的长度:${result.length}")
-    val sum = result.map(r=>r._2).sum
+    val sum = result.map(r => r._2).sum
     if (sum == 0) return PredictedResult(Array.empty)
 
     val weight = 1.0

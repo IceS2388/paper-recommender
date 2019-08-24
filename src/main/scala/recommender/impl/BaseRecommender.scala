@@ -8,6 +8,8 @@ package recommender.impl
   */
 
 import org.slf4j.{Logger, LoggerFactory}
+import recommender._
+import recommender.tools.Correlation
 
 import scala.collection.mutable
 
@@ -92,7 +94,7 @@ class BaseRecommender(val ap: BaseParams) extends Recommender {
             Correlation.getJaccard(ap.commonThreashold, u1, u2, userRatings)
           } else if (ap.method.toLowerCase() == "jaccardmsd") {
             Correlation.getJaccardMSD(ap.commonThreashold, u1, u2, userRatings)
-          }else if(ap.method.toLowerCase()=="adjustcosine"){
+          } else if (ap.method.toLowerCase() == "adjustcosine") {
             Correlation.getAdjustCosine(ap.commonThreashold, u1, u2, userRatings)
           }
           else {

@@ -4,7 +4,8 @@ package recommender.impl
   * Author:IceS
   * Date:2019-08-18 07:52:37
   * Description:
-  * NONE
+  * 1.修改为简单评分向量生成法则 2019年8月24日
+  *
   */
 
 import org.apache.spark.mllib.clustering.BisectingKMeans
@@ -16,11 +17,11 @@ import org.apache.spark.mllib.tree.model.RandomForestModel
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Row, SparkSession}
 import org.slf4j.{Logger, LoggerFactory}
-import recommender.tools.NearestUserAccumulator
+import recommender._
+import recommender.tools.{Correlation, NearestUserAccumulator}
 
 import scala.collection.mutable
 import scala.util.Random
-
 
 case class RandomForestClusterParams(
                                       //用户聚类部分
