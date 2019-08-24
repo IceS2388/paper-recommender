@@ -95,10 +95,14 @@ class Evaluation {
       *
       * F1 = 2TP / (2TP + FP + FN)
       **/
+    //调试信息
     logger.info(s"(Query, ActualResult)的数量：${testingData.size}")
+    val userCount=testingData.size
+    var idx=0
     val vsum = testingData.map(r => {
       //计算指标
-      logger.info(s"Query：${r._1.user},条数:${r._1.num}")
+      logger.info(s"第${idx+1}个用户，还剩下：${userCount-idx-1}个。Query：${r._1.user},条数:${r._1.num}")
+      idx+=1
 
       val startTime = System.currentTimeMillis()
       val predicts = recommender.predict(r._1)

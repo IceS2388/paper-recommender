@@ -12,9 +12,9 @@ object App {
   def main(args: Array[String]): Unit = {
 
     //runBase()
-    runCluster()
-    //runNCFCluster()
-    runRandomClusterForest()
+    //runCluster()
+    runNCFCluster()
+    //runRandomClusterForest()
     //runNCF()
     //runSAR()
     //runHot()
@@ -386,14 +386,20 @@ object App {
       //准确率:0.1853,召回率:0.0965,f1:0.1065,时间:153(ms)
       //ClusterParams(clusterMethod = "GaussianMixture", k = 7, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
       //准确率:0.1853,召回率:0.0963,f1:0.1065,时间:155(ms)
-      //maxIterations
-      ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
-      ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 20, numNearestUsers = 240, numUserLikeMovies = 240),
-      ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 30, numNearestUsers = 240, numUserLikeMovies = 240),
-      ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 40, numNearestUsers = 240, numUserLikeMovies = 240),
-      ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 50, numNearestUsers = 240, numUserLikeMovies = 240)
+      //maxIterations:10
+      //ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
+      //准确率:0.1862,召回率:0.0973,f1:0.1071,时间:220(ms)
+      //ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 20, numNearestUsers = 240, numUserLikeMovies = 240),
+      //准确率:0.1861,召回率:0.0972,f1:0.1071,时间:210(ms)
+      //ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 30, numNearestUsers = 240, numUserLikeMovies = 240),
+      //准确率:0.1862,召回率:0.0971,f1:0.1071,时间:177(ms)
+      //ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 40, numNearestUsers = 240, numUserLikeMovies = 240),
+      //准确率:0.1861,召回率:0.0971,f1:0.1070,时间:188(ms)
+      //ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 50, numNearestUsers = 240, numUserLikeMovies = 240)
+      //准确率:0.1861,召回率:0.0973,f1:0.1071,时间:206(ms)
 
       //GaussianMixture:簇心数量:2,maxIterations:10,相似度方法:Cosine,numNearestUsers:240,numUserLikeMovies:240
+      //准确率:0.1862,召回率:0.0973,f1:0.1071,时间:220(ms)
 
 
     )
@@ -405,10 +411,16 @@ object App {
   }
 
   def runNCFCluster(): Unit = {
-    val ap = NCFClusterParams()
-    val recommender = new NCFClusterRecommender(ap)
-    val eval = new Evaluation()
-    eval.run(recommender)
+
+    val args=List(
+      NCFClusterParams(maxIterations=10,numNearestUsers=240,numUserLikeMovies=240)
+    )
+    for (elem <- args) {
+      val recommender = new NCFClusterRecommender(elem)
+      val eval = new Evaluation()
+      eval.run(recommender)
+    }
+
   }
 
   def runRandomClusterForest(): Unit = {

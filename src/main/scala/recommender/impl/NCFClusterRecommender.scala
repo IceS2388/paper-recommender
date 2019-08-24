@@ -10,11 +10,11 @@ package recommender.impl
 import org.apache.spark.mllib.clustering.BisectingKMeans
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Row, SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.deeplearning4j.nn.api.OptimizationAlgorithm
 import org.deeplearning4j.nn.conf.NeuralNetConfiguration
 import org.deeplearning4j.nn.conf.graph.MergeVertex
+import org.deeplearning4j.nn.conf.layers.misc.ElementWiseMultiplicationLayer
 import org.deeplearning4j.nn.conf.layers.{DenseLayer, OutputLayer}
 import org.deeplearning4j.nn.graph.ComputationGraph
 import org.nd4j.linalg.activations.Activation
@@ -29,8 +29,6 @@ import scala.util.Random
 
 
 case class NCFClusterParams(
-                             userThreashold: Int = 20,
-                             itemThreashold: Int = 2,
                              method: String = "Cosine",
                              k: Int = 4,
                              maxIterations: Int = 20,
@@ -40,7 +38,7 @@ case class NCFClusterParams(
     this.getClass.getSimpleName.replace("Params", "") + s"_$method"
   }
 
-  override def toString: String = s"聚类参数{userThreashold:$userThreashold,itemThreashold:$itemThreashold,method:$method,k:$k,maxIterations:$maxIterations,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}\r\n"
+  override def toString: String = s"聚类参数{method:$method,k:$k,maxIterations:$maxIterations,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}\r\n"
 }
 
 
@@ -50,13 +48,14 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
   override def getParams: Params = ap
 
 
-  //用户的评分向量
-  private var afterClusterRDD: Array[(Int, (Int, linalg.Vector))] = _
   //训练集中用户所拥有item
   private var userHasItem: Map[Int, Seq[Rating]] = _
 
   //每个用户所有的物品
   private var allUserItemSet: Map[Int, Set[Int]] = _
+
+  //用户的评分向量
+  private var afterClusterRDD: Array[(Int, (Int, linalg.Vector))] = _
 
   override def prepare(data: Seq[Rating]): PrepairedData = {
 
@@ -77,101 +76,76 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
   override def train(data: TrainingData): Unit = {
 
     require(data.ratings.nonEmpty, "训练数据不能为空！")
-    /** -------------------构建用户和物品的特征向量--------------------- **/
-    val fields: Seq[StructField] = List(
-      StructField("uid", IntegerType, nullable = false),
-      StructField("iid", IntegerType, nullable = false),
-      StructField("rating", DoubleType, nullable = false),
-      StructField("tt", LongType, nullable = false)
-    )
-    val schema = StructType(fields)
+
+    //1.获取训练集中每个用户的观看列表
+    userHasItem = data.ratings.groupBy(_.user)
+
+    //2.生成用户喜欢的电影
+    userLikedMap = userLikedItems()
+
+    //实现新的统计方法
+    val userVectors = userHasItem.map(r => {
+      val uid = r._1
+      var c1 = 0D //1.0
+      var c2 = 0D //2.0
+      var c3 = 0D //3.0
+      var c4 = 0D //4.0
+      var c5 = 0D //5.0
+
+      r._2.foreach(r2 => {
+        if (r2.rating == 1.0)
+          c1 += 1
+        else if (r2.rating == 2.0)
+          c2 += 1
+        else if (r2.rating == 3.0)
+          c3 += 1
+        else if (r2.rating == 4.0)
+          c4 += 1
+        else
+          c5 += 1
+      })
+
+      (uid, Vectors.dense(c1, c2, c3, c4, c5))
+    }).toSeq
+
+    //2.生成物品的统计列表
+    val itemVectors = data.ratings.groupBy(_.item).map(r => {
+      val iid = r._1
+
+      var c1 = 0D //1.0
+      var c2 = 0D //2.0
+      var c3 = 0D //3.0
+      var c4 = 0D //4.0
+      var c5 = 0D //5.0
+
+      r._2.foreach(r2 => {
+        if (r2.rating == 1.0)
+          c1 += 1
+        else if (r2.rating == 2.0)
+          c2 += 1
+        else if (r2.rating == 3.0)
+          c3 += 1
+        else if (r2.rating == 4.0)
+          c4 += 1
+        else
+          c5 += 1
+      })
+      (iid, Vectors.dense(c1, c2, c3, c4, c5))
+    }).toSeq
+
+    newUserVector = userVectors.toMap
+    newItemVector = itemVectors.toMap
+
+
     val sparkSession = SparkSession.builder().master("local[*]").appName(this.getClass.getSimpleName).getOrCreate()
-
-    val rowRDD = sparkSession.sparkContext.parallelize(data.ratings.map(r => Row(r.user, r.item, r.rating, r.timestamp)))
-
-    val ratingsDF = sparkSession.createDataFrame(rowRDD, schema)
-    ratingsDF.createOrReplaceTempView("ratings")
-
-
-    //1.生成用户的评分向量
-    val userVectorsDF = sparkSession.sql(
-      """
-        |SELECT uid,
-        |COUNT(CASE WHEN rating=0.5 THEN 1 END) AS c1,
-        |COUNT(CASE WHEN rating=1.0 THEN 1 END) AS c2,
-        |COUNT(CASE WHEN rating=1.5 THEN 1 END) AS c3,
-        |COUNT(CASE WHEN rating=2.0 THEN 1 END) AS c4,
-        |COUNT(CASE WHEN rating=2.5 THEN 1 END) AS c5,
-        |COUNT(CASE WHEN rating=3.0 THEN 1 END) AS c6,
-        |COUNT(CASE WHEN rating=3.5 THEN 1 END) AS c7,
-        |COUNT(CASE WHEN rating=4.0 THEN 1 END) AS c8,
-        |COUNT(CASE WHEN rating=4.5 THEN 1 END) AS c9,
-        |COUNT(CASE WHEN rating=5.0 THEN 1 END) AS c10,
-        |COUNT(rating) AS total
-        |FROM ratings
-        |GROUP BY uid
-        |ORDER BY total ASC
-      """.stripMargin)
-    userVectorsDF.createOrReplaceTempView("uv")
-    userVectorsDF.show()
-
-    //2.生成物品的评分向量
-    val itemVectorsDF = sparkSession.sql(
-      """
-        |SELECT iid,
-        |COUNT(CASE WHEN rating=0.5 THEN 1 END) AS c1,
-        |COUNT(CASE WHEN rating=1.0 THEN 1 END) AS c2,
-        |COUNT(CASE WHEN rating=1.5 THEN 1 END) AS c3,
-        |COUNT(CASE WHEN rating=2.0 THEN 1 END) AS c4,
-        |COUNT(CASE WHEN rating=2.5 THEN 1 END) AS c5,
-        |COUNT(CASE WHEN rating=3.0 THEN 1 END) AS c6,
-        |COUNT(CASE WHEN rating=3.5 THEN 1 END) AS c7,
-        |COUNT(CASE WHEN rating=4.0 THEN 1 END) AS c8,
-        |COUNT(CASE WHEN rating=4.5 THEN 1 END) AS c9,
-        |COUNT(CASE WHEN rating=5.0 THEN 1 END) AS c10,
-        |COUNT(rating) AS total
-        |FROM ratings
-        |GROUP BY iid
-        |ORDER BY total ASC
-      """.stripMargin)
-    itemVectorsDF.createOrReplaceTempView("iv")
-    itemVectorsDF.show()
 
 
     /** -------------------对用户评分向量进行聚类--------------------- **/
     logger.info("正在对用户评分向量进行聚类，需要些时间...")
     //3.准备聚类
-    userVectorsDF.printSchema()
-    val userVectorsRDD = userVectorsDF.rdd.map(r => {
-      val total = r.getAs[Long]("total").toFloat
-      (r.getAs[Int]("uid"), Vectors.dense(
-        r.getAs[Long]("c1") / total,
-        r.getAs[Long]("c2") / total,
-        r.getAs[Long]("c3") / total,
-        r.getAs[Long]("c4") / total,
-        r.getAs[Long]("c5") / total,
-        r.getAs[Long]("c6") / total,
-        r.getAs[Long]("c7") / total,
-        r.getAs[Long]("c8") / total,
-        r.getAs[Long]("c9") / total,
-        r.getAs[Long]("c10") / total
-      ))
-    })
-    val itemVectorsRDD = itemVectorsDF.rdd.map(r => {
-      val total = r.getAs[Long]("total").toFloat
-      (r.getAs[Int]("iid"), Vectors.dense(
-        r.getAs[Long]("c1") / total,
-        r.getAs[Long]("c2") / total,
-        r.getAs[Long]("c3") / total,
-        r.getAs[Long]("c4") / total,
-        r.getAs[Long]("c5") / total,
-        r.getAs[Long]("c6") / total,
-        r.getAs[Long]("c7") / total,
-        r.getAs[Long]("c8") / total,
-        r.getAs[Long]("c9") / total,
-        r.getAs[Long]("c10") / total
-      ))
-    })
+
+    val userVectorsRDD = sparkSession.sparkContext.parallelize(userVectors)
+    //val itemVectorsRDD = sparkSession.sparkContext.parallelize(itemVectors)
 
     val bkm = new BisectingKMeans().setK(ap.k).setMaxIterations(ap.maxIterations)
     val model = bkm.run(userVectorsRDD.map(_._2))
@@ -184,18 +158,8 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
     }).collect()
 
     /** -------------------生成共享数据--------------------- **/
-    newUserVector = userVectorsRDD.collectAsMap()
-    newItemVector = itemVectorsRDD.collectAsMap()
 
     sparkSession.close()
-
-    //1.获取训练集中每个用户的观看列表
-    userHasItem = data.ratings.groupBy(_.user)
-
-    //2.生成用户喜欢的电影
-    userLikedMap = userLikedItems()
-    //调试信息
-    logger.info("训练集中的用户总数:" + userLikedMap.size)
 
     //3.根据用户评分向量生成用户最邻近用户的列表
     logger.info("计算用户邻近的相似用户中....")
@@ -203,22 +167,32 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
 
 
     /** -------------------神经网络--------------------- **/
-    val unit = newUserVector.head._2.size + newItemVector.head._2.size
+    val userVS = newUserVector.head._2.size
+    val itemVS = newItemVector.head._2.size
+    val unitMax = Math.max(userVS, itemVS)
+    val unionSize = userVS + itemVS
+
+
     //1.配置网络结构
     val computationGraphConf = new NeuralNetConfiguration.Builder()
       .seed(123)
-      .activation(Activation.SIGMOID)
+      .activation(Activation.RELU)
       .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
       .updater(new org.nd4j.linalg.learning.config.AdaDelta())
       .l2(1e-3)
       .graphBuilder()
-      .addInputs("input")
-      .addLayer("GML", new DenseLayer.Builder().nIn(unit).activation(Activation.RELU).nOut(1).build(), "input")
-      .addLayer("MLP4", new DenseLayer.Builder().nIn(unit).activation(Activation.RELU).nOut(4 * unit).build(), "input")
-      .addLayer("MLP2", new DenseLayer.Builder().nIn(4 * unit).nOut(2 * unit).build(), "MLP4")
-      .addLayer("MLP1", new DenseLayer.Builder().nIn(2 * unit).nOut(unit).build(), "MLP2")
+      .addInputs("user_input", "item_input")
+
+      .addLayer("userLayer", new DenseLayer.Builder().nIn(userVS).nOut(userVS).activation(Activation.IDENTITY).build(), "user_input")
+      .addLayer("itemLayer", new DenseLayer.Builder().nIn(itemVS).nOut(itemVS).activation(Activation.IDENTITY).build(), "item_input")
+      .addLayer("GML", new ElementWiseMultiplicationLayer.Builder().nIn(unionSize).nOut(unionSize).build(), "userLayer", "itemLayer")
+
+      .addVertex("input", new MergeVertex(), "userLayer", "itemLayer")
+      .addLayer("MLP4", new DenseLayer.Builder().nIn(unionSize).nOut(4 * unionSize).build(), "input")
+      .addLayer("MLP2", new DenseLayer.Builder().nIn(4 * unionSize).nOut(2 * unionSize).build(), "MLP4")
+      .addLayer("MLP1", new DenseLayer.Builder().activation(Activation.SIGMOID).nIn(2 * unionSize).nOut(unionSize).build(), "MLP2")
       .addVertex("ncf", new MergeVertex(), "GML", "MLP1")
-      .addLayer("out", new OutputLayer.Builder().nIn(unit + 1).nOut(2).build(), "ncf")
+      .addLayer("out", new OutputLayer.Builder().nIn(unionSize + unionSize).activation(Activation.SOFTMAX).nOut(2).build(), "ncf")
       .setOutputs("out")
       .build()
 
@@ -231,18 +205,18 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
 
     //2.正样本数据
     logger.info("正样本数据")
-    val positiveData: Seq[(Int, INDArray, INDArray)] = data.ratings.map(r => {
+    val positiveData: Seq[(Int, INDArray, INDArray, INDArray)] = data.ratings.map(r => {
       //构建特征数据
       val userV: linalg.Vector = newUserVector(r.user)
       val itemV: linalg.Vector = newItemVector(r.item)
-      val arr = new Array[Float](userV.size + itemV.size)
 
+      val userArray = new Array[Float](userV.size)
       for (idx <- 0 until userV.size) {
-        arr(idx) = userV(idx).toFloat
+        userArray(idx) = userV(idx).toFloat
       }
-
+      val itemArray = new Array[Float](itemV.size)
       for (idx <- 0 until itemV.size) {
-        arr(idx + userV.size) = itemV(idx).toFloat
+        itemArray(idx) = itemV(idx).toFloat
       }
 
       //生成标签
@@ -250,12 +224,15 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
       la(0) = 0
       la(1) = 1
 
-      (Random.nextInt(size), Nd4j.create(arr).reshape(1, arr.length), Nd4j.create(la).reshape(1, 2))
+      (Random.nextInt(size),
+        Nd4j.create(userArray).reshape(1, userArray.length),
+        Nd4j.create(itemArray).reshape(1, itemArray.length),
+        Nd4j.create(la).reshape(1, 2))
     })
 
     //3.负样本数据
     logger.info("负样本数据")
-    val negativeData: Seq[(Int, INDArray, INDArray)] = userHasItem.flatMap(r => {
+    val negativeData: Seq[(Int, INDArray, INDArray, INDArray)] = userHasItem.flatMap(r => {
       val userHadSet = r._2.map(_.item).distinct.toSet
       //TODO 这里有bug，测试集的数据可能在里面
       val negativeSet = allItemsSet.diff(userHadSet)
@@ -266,27 +243,30 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
 
       nSet.map(itemID => {
         val itemV = newItemVector(itemID)
-        val arr = new Array[Float](userV.size + itemV.size)
 
+        val userArray = new Array[Float](userV.size)
         for (idx <- 0 until userV.size) {
-          arr(idx) = userV(idx).toFloat
+          userArray(idx) = userV(idx).toFloat
         }
-
+        val itemArray = new Array[Float](itemV.size)
         for (idx <- 0 until itemV.size) {
-          arr(idx + userV.size) = itemV(idx).toFloat
+          itemArray(idx) = itemV(idx).toFloat
         }
 
         //生成标签
         val la = new Array[Float](2)
         la(0) = 1
         la(1) = 0
-        (Random.nextInt(size), Nd4j.create(arr).reshape(1, arr.length), Nd4j.create(la).reshape(1, 2))
+        (Random.nextInt(size),
+          Nd4j.create(userArray).reshape(1, userArray.length),
+          Nd4j.create(itemArray).reshape(1, itemArray.length),
+          Nd4j.create(la).reshape(1, 2))
       })
     }).toSeq
 
     //4.数据打散
     logger.info("数据打散")
-    val trainTempData = new Array[(Int, INDArray, INDArray)](positiveData.size + negativeData.size)
+    val trainTempData = new Array[(Int, INDArray, INDArray, INDArray)](positiveData.size + negativeData.size)
     var idx = 0
     positiveData.foreach(r => {
       trainTempData(idx) = r
@@ -299,7 +279,7 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
     })
 
     val finalData = trainTempData.sortBy(_._1).map(r => {
-      (r._2, r._3)
+      (r._2, r._3, r._4)
     })
 
     //训练模型
@@ -310,7 +290,7 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
         logger.info(s"index:$logIdx")
       }
 
-      ncfModel.fit(Array(r._1), Array(r._2))
+      ncfModel.fit(Array(r._1, r._2), Array(r._3))
       logIdx += 1
     })
     logger.info("训练模型完成")
@@ -426,16 +406,23 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
       val userV = newUserVector(query.user)
       val itemV = newItemVector(r._1)
       //生成特征向量
-      val arr = new Array[Float](userV.size + itemV.size)
-
+      val userArray = new Array[Float](userV.size)
       for (idx <- 0 until userV.size) {
-        arr(idx) = userV(idx).toFloat
+        userArray(idx) = userV(idx).toFloat
       }
+      val itemArray = new Array[Float](itemV.size)
       for (idx <- 0 until itemV.size) {
-        arr(idx + userV.size) = itemV(idx).toFloat
+        itemArray(idx) = itemV(idx).toFloat
       }
 
-      val vs: Array[INDArray] = ncfModel.output(Nd4j.create(arr).reshape(1, arr.length))
+
+      val vU = Nd4j.create(userArray).reshape(1, userArray.length)
+
+      val vI = Nd4j.create(itemArray).reshape(1, itemArray.length)
+
+      val start = System.currentTimeMillis()
+      val vs: Array[INDArray] = ncfModel.output(vU, vI)
+      logger.info("计算所需时间：" + (System.currentTimeMillis() - start))
 
       val sc = vs(0).getFloat(1)
       if (logN < 2) {
