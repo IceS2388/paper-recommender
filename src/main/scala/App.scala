@@ -14,7 +14,7 @@ object App {
     //runBase()
     runCluster()
     //runNCFCluster()
-    //runRandomClusterForest()
+    runRandomClusterForest()
     //runNCF()
     //runSAR()
     //runHot()
@@ -77,7 +77,6 @@ object App {
       //准确率:0.1465,召回率:0.0969,f1:0.0934,时间:1(ms)
 
 
-
       //AdjustCosine
       //numUserLikeMovies测试 结论：5最高
       //BaseParams(method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5),
@@ -129,7 +128,6 @@ object App {
 
       //最优参数 commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
       //准确率:0.1493,召回率:0.0935,f1:0.0931,时间:0(ms)
-
 
 
       //Jaccard相似度
@@ -253,6 +251,7 @@ object App {
     //结论：Jaccard的准确率最高
     //Jaccard总结：最优参数 commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5
     //准确率:0.1514,召回率:0.1060,f1:0.1029,时间:1(ms)
+
     for (arg <- args) {
       val recommender = new BaseRecommender(arg)
       val eval = new Evaluation()
@@ -264,6 +263,7 @@ object App {
     //1.生成参数列表
     val args = List(
 
+      /***------------------BisectingKMeans------------------***/
       //BisectingKMeans
       // k: 2 变化波动不太大
       //ClusterParams(clusterMethod = "BisectingKMeans", k = 2, maxIterations = 10),
@@ -335,7 +335,7 @@ object App {
       //最优参数：K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
       //最好结果：准确率:0.1833,召回率:0.1002,f1:0.1084,时间:94(ms)
 
-      //K-means
+      /***------------------K-means------------------***/
       //maxIterations:10
       //ClusterParams(clusterMethod = "K-means", k = 4, maxIterations = 5, numNearestUsers = 240, numUserLikeMovies = 240),
       //准确率:0.1839,召回率:0.1012,f1:0.1089,时间:102(ms)
@@ -371,13 +371,29 @@ object App {
       //K-means最优参数：k = 4, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240
       //准确率:0.1849,召回率:0.1014,f1:0.1092,时间:112(ms)
 
+      /***------------------GaussianMixture------------------***/
       //GaussianMixture
+      //k:2
+      //ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
+      //准确率:0.1861,召回率:0.0972,f1:0.1071,时间:269(ms)
+      //ClusterParams(clusterMethod = "GaussianMixture", k = 3, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
+      //准确率:0.1861,召回率:0.0971,f1:0.1070,时间:302(ms)
+      //ClusterParams(clusterMethod = "GaussianMixture", k = 4, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
+      //准确率:0.1858,召回率:0.0970,f1:0.1069,时间:186(ms)
+      //ClusterParams(clusterMethod = "GaussianMixture", k = 5, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
+      //准确率:0.1858,召回率:0.0966,f1:0.1066,时间:187(ms)
+      //ClusterParams(clusterMethod = "GaussianMixture", k = 6, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
+      //准确率:0.1853,召回率:0.0965,f1:0.1065,时间:153(ms)
+      //ClusterParams(clusterMethod = "GaussianMixture", k = 7, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
+      //准确率:0.1853,召回率:0.0963,f1:0.1065,时间:155(ms)
+      //maxIterations
       ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
-      ClusterParams(clusterMethod = "GaussianMixture", k = 3, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
-      ClusterParams(clusterMethod = "GaussianMixture", k = 4, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
-      ClusterParams(clusterMethod = "GaussianMixture", k = 5, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
-      ClusterParams(clusterMethod = "GaussianMixture", k = 6, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
-      ClusterParams(clusterMethod = "GaussianMixture", k = 7, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240)
+      ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 20, numNearestUsers = 240, numUserLikeMovies = 240),
+      ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 30, numNearestUsers = 240, numUserLikeMovies = 240),
+      ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 40, numNearestUsers = 240, numUserLikeMovies = 240),
+      ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 50, numNearestUsers = 240, numUserLikeMovies = 240)
+
+      //GaussianMixture:簇心数量:2,maxIterations:10,相似度方法:Cosine,numNearestUsers:240,numUserLikeMovies:240
 
 
     )
@@ -397,10 +413,18 @@ object App {
 
   def runRandomClusterForest(): Unit = {
 
-    val ap = RandomForestClusterParams()
-    val recommender = new RandomForestClusterRecommender(ap)
-    val eval = new Evaluation()
-    eval.run(recommender)
+    //BisectingKMeans K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
+    //cosine:commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
+    val args = List(
+      RandomForestClusterParams(k = 4,numNearestUsers = 240,numUserLikeMovies=240,maxIterationsCluster=10)//,
+      //RandomForestClusterParams()
+    )
+    for (elem <- args) {
+      val recommender = new RandomForestClusterRecommender(elem)
+      val eval = new Evaluation()
+      eval.run(recommender)
+    }
+
   }
 
   def runNCF(): Unit = {

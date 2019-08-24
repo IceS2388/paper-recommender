@@ -14,8 +14,7 @@ import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.tree.RandomForest
 import org.apache.spark.mllib.tree.model.RandomForestModel
-import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Row, SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.slf4j.{Logger, LoggerFactory}
 import recommender._
 import recommender.tools.{Correlation, NearestUserAccumulator}
@@ -25,8 +24,6 @@ import scala.util.Random
 
 case class RandomForestClusterParams(
                                       //用户聚类部分
-                                      userThreashold: Int = 20,
-                                      itemThreashold: Int = 2,
                                       method: String = "Cosine",
                                       k: Int = 4,
                                       maxIterationsCluster: Int = 20,
@@ -43,7 +40,8 @@ case class RandomForestClusterParams(
   override def getName(): String = this.getClass.getSimpleName.replace("Params", "")
 
   override def toString: String = {
-    s"${this.getClass.getSimpleName}:聚类部分：{邻近用户数量：$userThreashold,计算相似度时物品数量阀值:$itemThreashold,计算相似度方法：$method,聚类中心数量:$k}\r\n随机森林部分：{最大迭代次数:$maxIterations,分类数量:$numClass,子数数量:$numTrees,子树分割策略:$featureSubsetStrategy,impurity:$impurity,最大数深:$maxDepth,maxBins:$maxBins}\r\n"
+    s"${this.getClass.getSimpleName}:聚类部分：{邻近用户数量：$numNearestUsers,numUserLikeMovies:$numUserLikeMovies,计算相似度方法：$method,聚类中心数量:$k}\r\n" +
+      s"随机森林部分：{最大迭代次数:$maxIterations,分类数量:$numClass,子数数量:$numTrees,子树分割策略:$featureSubsetStrategy,impurity:$impurity,最大数深:$maxDepth,maxBins:$maxBins}\r\n"
   }
 }
 
@@ -80,101 +78,77 @@ class RandomForestClusterRecommender(ap: RandomForestClusterParams) extends Reco
   override def train(data: TrainingData): Unit = {
 
     require(data.ratings.nonEmpty, "训练数据不能为空！")
+
     /** -------------------构建用户和物品的特征向量--------------------- **/
-    val fields: Seq[StructField] = List(
-      StructField("uid", IntegerType, nullable = false),
-      StructField("iid", IntegerType, nullable = false),
-      StructField("rating", DoubleType, nullable = false),
-      StructField("tt", LongType, nullable = false)
-    )
-    val schema = StructType(fields)
+    //1.获取训练集中每个用户的观看列表
+    userHasItem = data.ratings.groupBy(_.user)
+
+    //2.生成用户喜欢的电影
+    userLikedMap = userLikedItems()
+
+    //实现新的统计方法
+    val userVectors = userHasItem.map(r => {
+      val uid = r._1
+      var c1 = 0D //1.0
+      var c2 = 0D //2.0
+      var c3 = 0D //3.0
+      var c4 = 0D //4.0
+      var c5 = 0D //5.0
+
+      r._2.foreach(r2 => {
+        if (r2.rating == 1.0)
+          c1 += 1
+        else if (r2.rating == 2.0)
+          c2 += 1
+        else if (r2.rating == 3.0)
+          c3 += 1
+        else if (r2.rating == 4.0)
+          c4 += 1
+        else
+          c5 += 1
+      })
+
+      (uid, Vectors.dense(c1, c2, c3, c4, c5))
+    }).toSeq
+
+    //2.生成物品的统计列表
+    val itemVectors = data.ratings.groupBy(_.item).map(r => {
+      val iid = r._1
+
+      var c1 = 0D //1.0
+      var c2 = 0D //2.0
+      var c3 = 0D //3.0
+      var c4 = 0D //4.0
+      var c5 = 0D //5.0
+
+      r._2.foreach(r2 => {
+        if (r2.rating == 1.0)
+          c1 += 1
+        else if (r2.rating == 2.0)
+          c2 += 1
+        else if (r2.rating == 3.0)
+          c3 += 1
+        else if (r2.rating == 4.0)
+          c4 += 1
+        else
+          c5 += 1
+      })
+      (iid, Vectors.dense(c1, c2, c3, c4, c5))
+    }).toSeq
+
+    newUserVector = userVectors.toMap
+    newItemVector = itemVectors.toMap
+
+
     val sparkSession = SparkSession.builder().master("local[*]").appName(this.getClass.getSimpleName).getOrCreate()
-
-    val rowRDD = sparkSession.sparkContext.parallelize(data.ratings.map(r => Row(r.user, r.item, r.rating, r.timestamp)))
-
-    val ratingsDF = sparkSession.createDataFrame(rowRDD, schema)
-    ratingsDF.createOrReplaceTempView("ratings")
-
-
-    //1.生成用户的评分向量
-    val userVectorsDF = sparkSession.sql(
-      """
-        |SELECT uid,
-        |COUNT(CASE WHEN rating=0.5 THEN 1 END) AS c1,
-        |COUNT(CASE WHEN rating=1.0 THEN 1 END) AS c2,
-        |COUNT(CASE WHEN rating=1.5 THEN 1 END) AS c3,
-        |COUNT(CASE WHEN rating=2.0 THEN 1 END) AS c4,
-        |COUNT(CASE WHEN rating=2.5 THEN 1 END) AS c5,
-        |COUNT(CASE WHEN rating=3.0 THEN 1 END) AS c6,
-        |COUNT(CASE WHEN rating=3.5 THEN 1 END) AS c7,
-        |COUNT(CASE WHEN rating=4.0 THEN 1 END) AS c8,
-        |COUNT(CASE WHEN rating=4.5 THEN 1 END) AS c9,
-        |COUNT(CASE WHEN rating=5.0 THEN 1 END) AS c10,
-        |COUNT(rating) AS total
-        |FROM ratings
-        |GROUP BY uid
-        |ORDER BY total ASC
-      """.stripMargin)
-    userVectorsDF.createOrReplaceTempView("uv")
-    userVectorsDF.show()
-
-    //2.生成物品的评分向量
-    val itemVectorsDF = sparkSession.sql(
-      """
-        |SELECT iid,
-        |COUNT(CASE WHEN rating=0.5 THEN 1 END) AS c1,
-        |COUNT(CASE WHEN rating=1.0 THEN 1 END) AS c2,
-        |COUNT(CASE WHEN rating=1.5 THEN 1 END) AS c3,
-        |COUNT(CASE WHEN rating=2.0 THEN 1 END) AS c4,
-        |COUNT(CASE WHEN rating=2.5 THEN 1 END) AS c5,
-        |COUNT(CASE WHEN rating=3.0 THEN 1 END) AS c6,
-        |COUNT(CASE WHEN rating=3.5 THEN 1 END) AS c7,
-        |COUNT(CASE WHEN rating=4.0 THEN 1 END) AS c8,
-        |COUNT(CASE WHEN rating=4.5 THEN 1 END) AS c9,
-        |COUNT(CASE WHEN rating=5.0 THEN 1 END) AS c10,
-        |COUNT(rating) AS total
-        |FROM ratings
-        |GROUP BY iid
-        |ORDER BY total ASC
-      """.stripMargin)
-    itemVectorsDF.createOrReplaceTempView("iv")
-    itemVectorsDF.show()
 
 
     /** -------------------对用户评分向量进行聚类--------------------- **/
     logger.info("正在对用户评分向量进行聚类，需要些时间...")
     //3.准备聚类
-    userVectorsDF.printSchema()
-    val userVectorsRDD = userVectorsDF.rdd.map(r => {
-      val total = r.getAs[Long]("total").toFloat
-      (r.getAs[Int]("uid"), Vectors.dense(
-        r.getAs[Long]("c1") / total,
-        r.getAs[Long]("c2") / total,
-        r.getAs[Long]("c3") / total,
-        r.getAs[Long]("c4") / total,
-        r.getAs[Long]("c5") / total,
-        r.getAs[Long]("c6") / total,
-        r.getAs[Long]("c7") / total,
-        r.getAs[Long]("c8") / total,
-        r.getAs[Long]("c9") / total,
-        r.getAs[Long]("c10") / total
-      ))
-    })
-    val itemVectorsRDD = itemVectorsDF.rdd.map(r => {
-      val total = r.getAs[Long]("total").toFloat
-      (r.getAs[Int]("iid"), Vectors.dense(
-        r.getAs[Long]("c1") / total,
-        r.getAs[Long]("c2") / total,
-        r.getAs[Long]("c3") / total,
-        r.getAs[Long]("c4") / total,
-        r.getAs[Long]("c5") / total,
-        r.getAs[Long]("c6") / total,
-        r.getAs[Long]("c7") / total,
-        r.getAs[Long]("c8") / total,
-        r.getAs[Long]("c9") / total,
-        r.getAs[Long]("c10") / total
-      ))
-    })
+
+    val userVectorsRDD = sparkSession.sparkContext.parallelize(userVectors)
+    //val itemVectorsRDD = sparkSession.sparkContext.parallelize(itemVectors)
 
     val bkm = new BisectingKMeans().setK(ap.k).setMaxIterations(ap.maxIterations)
     val model = bkm.run(userVectorsRDD.map(_._2))
@@ -185,20 +159,6 @@ class RandomForestClusterRecommender(ap: RandomForestClusterParams) extends Reco
     afterClusterRDD = userVectorsRDD.map(r => {
       (model.predict(r._2), r)
     }).collect()
-
-    /** -------------------生成共享数据--------------------- **/
-    newUserVector = userVectorsRDD.collectAsMap()
-    newItemVector = itemVectorsRDD.collectAsMap()
-
-
-
-    //1.获取训练集中每个用户的观看列表
-    userHasItem = data.ratings.groupBy(_.user)
-
-    //2.生成用户喜欢的电影
-    userLikedMap = userLikedItems()
-    //调试信息
-    logger.info("训练集中的用户总数:" + userLikedMap.size)
 
     //3.根据用户评分向量生成用户最邻近用户的列表
     logger.info("计算用户邻近的相似用户中....")
