@@ -37,7 +37,8 @@ case class RandomForestClusterParams(
                                       impurity: String = "gini",
                                       maxDepth: Int = 5,
                                       maxBins: Int = 100) extends Params {
-  override def getName(): String = this.getClass.getSimpleName.replace("Params", "")
+  override def getName(): String = {
+    this.getClass.getSimpleName.replace("Params", "")+s"_$method"}
 
   override def toString: String = {
     s"${this.getClass.getSimpleName}:聚类部分：{邻近用户数量：$numNearestUsers,numUserLikeMovies:$numUserLikeMovies,计算相似度方法：$method,聚类中心数量:$k}\r\n" +
@@ -57,11 +58,11 @@ class RandomForestClusterRecommender(ap: RandomForestClusterParams) extends Reco
   private var userHasItem: Map[Int, Seq[Rating]] = _
 
   //每个用户所有的物品
-  private var allUserItemSet: Map[Int, Set[Int]] = _
+  private var allUserHadItemsMap: Map[Int, Set[Int]] = _
 
   override def prepare(data: Seq[Rating]): PrepairedData = {
 
-    allUserItemSet = data.groupBy(_.user).map(r => {
+    allUserHadItemsMap = data.groupBy(_.user).map(r => {
       val userId = r._1
       //
       val itemSet = r._2.map(_.item).toSet
@@ -167,7 +168,7 @@ class RandomForestClusterRecommender(ap: RandomForestClusterParams) extends Reco
 
     /** -------------------随机森林模型--------------------- **/
     //1.数据准备，正样品数和负样品数
-    val allItemsSet = data.ratings.map(_.item).distinct.toSet
+    val trainingItemSet = data.ratings.map(_.item).distinct.toSet
     val size = data.ratings.size
 
     //2.正样本数据
@@ -196,7 +197,12 @@ class RandomForestClusterRecommender(ap: RandomForestClusterParams) extends Reco
       //当前用户拥有的物品集合
       val userHadSet = r._2.map(_.item).distinct.toSet
 
-      val negativeSet = allItemsSet.diff(userHadSet)
+      //未分割前的所有物品
+      val userHadAllSet=allUserHadItemsMap(r._1)
+      //用户测试集中的物品
+      val userTestSet=userHadAllSet.diff(userHadSet)
+
+      val negativeSet = trainingItemSet.diff(userHadSet).diff(userTestSet)
 
       //保证负样本的数量，和正样本数量一致
       val nSet = Random.shuffle(negativeSet).take(userHadSet.size)

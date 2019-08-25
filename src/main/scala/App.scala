@@ -13,9 +13,9 @@ object App {
 
     //runBase()
     //runCluster()
-    runNCFCluster()
     //runRandomClusterForest()
-    //runNCF()
+    runNCFCluster()
+    runNCF()
     //runSAR()
     //runHot()
 
@@ -413,7 +413,9 @@ object App {
   def runNCFCluster(): Unit = {
 
     val args=List(
-      NCFClusterParams(maxIterations=10,numNearestUsers=240,numUserLikeMovies=240)
+      NCFClusterParams(maxIterations=10,numNearestUsers=240,numUserLikeMovies=240),
+      NCFClusterParams(method="ImprovedPearson", maxIterations=10,numNearestUsers=240,numUserLikeMovies=240),
+      NCFClusterParams(method="pearson", maxIterations=10,numNearestUsers=240,numUserLikeMovies=240)
     )
     for (elem <- args) {
       val recommender = new NCFClusterRecommender(elem)
@@ -425,11 +427,28 @@ object App {
 
   def runRandomClusterForest(): Unit = {
 
-    //BisectingKMeans K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
-    //cosine:commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
+
     val args = List(
+      /** BisectingKMeans K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
+       *  cosine:commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
+       */
       RandomForestClusterParams(k = 4,numNearestUsers = 240,numUserLikeMovies=240,maxIterationsCluster=10)//,
-      //RandomForestClusterParams()
+      //准确率:0.2176,召回率:0.1304,f1:0.1327,时间:102(ms)
+
+
+      /**
+        * RandomForestClusterParams:聚类部分：{邻近用户数量：240,numUserLikeMovies:240,
+        * 计算相似度方法：improvedpearson,聚类中心数量:4}
+        */
+      //RandomForestClusterParams(method = "improvedpearson",k = 4,numNearestUsers = 240,numUserLikeMovies=240,maxIterationsCluster=10),
+      //准确率:0.1902,召回率:0.1276,f1:0.1250,时间:152(ms)
+      /**
+        * RandomForestClusterParams:聚类部分：{邻近用户数量：240,numUserLikeMovies:240,计算相似度方法：pearson,
+        * 聚类中心数量:4}
+        * 随机森林部分：{最大迭代次数:20,分类数量:2,子数数量:5,子树分割策略:auto,impurity:gini,最大数深:5,maxBins:100}
+        * */
+      //RandomForestClusterParams(method = "pearson",k = 4,numNearestUsers = 240,numUserLikeMovies=240,maxIterationsCluster=10)
+      //准确率:0.2170,召回率:0.1305,f1:0.1327,时间:113(ms)
     )
     for (elem <- args) {
       val recommender = new RandomForestClusterRecommender(elem)

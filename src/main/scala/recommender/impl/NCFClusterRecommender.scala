@@ -7,6 +7,11 @@ package recommender.impl
   * 结合NCF和Cluster集群算法
   */
 
+import java.io.FileWriter
+import java.nio.file.Paths
+import java.text.SimpleDateFormat
+import java.util.Date
+
 import org.apache.spark.mllib.clustering.BisectingKMeans
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.Vectors
@@ -54,10 +59,15 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
   //每个用户所有的物品
   private var allUserItemSet: Map[Int, Set[Int]] = _
 
+
   //用户的评分向量
   private var afterClusterRDD: Array[(Int, (Int, linalg.Vector))] = _
 
   override def prepare(data: Seq[Rating]): PrepairedData = {
+
+    val hitFile = Paths.get("spark-warehouse", s"hitRecord_${new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date)}.txt").toFile()
+
+    fw = new FileWriter(hitFile)
 
     allUserItemSet = data.groupBy(_.user).map(r => {
       val userId = r._1
@@ -75,6 +85,7 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
 
   override def train(data: TrainingData): Unit = {
 
+    require(Set("cosine", "improvedpearson", "pearson").contains(ap.method.toLowerCase()))
     require(data.ratings.nonEmpty, "训练数据不能为空！")
 
     //1.获取训练集中每个用户的观看列表
@@ -169,7 +180,6 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
     /** -------------------神经网络--------------------- **/
     val userVS = newUserVector.head._2.size
     val itemVS = newItemVector.head._2.size
-    val unitMax = Math.max(userVS, itemVS)
     val unionSize = userVS + itemVS
 
 
@@ -200,7 +210,7 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
     ncfModel = new ComputationGraph(computationGraphConf)
     ncfModel.init()
 
-    val allItemsSet = data.ratings.map(_.item).distinct.toSet
+
     val size = data.ratings.size
 
     //2.正样本数据
@@ -210,56 +220,44 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
       val userV: linalg.Vector = newUserVector(r.user)
       val itemV: linalg.Vector = newItemVector(r.item)
 
-      val userArray = new Array[Float](userV.size)
-      for (idx <- 0 until userV.size) {
-        userArray(idx) = userV(idx).toFloat
-      }
-      val itemArray = new Array[Float](itemV.size)
-      for (idx <- 0 until itemV.size) {
-        itemArray(idx) = itemV(idx).toFloat
-      }
-
       //生成标签
-      val la = new Array[Float](2)
+      val la = new Array[Double](2)
       la(0) = 0
       la(1) = 1
 
       (Random.nextInt(size),
-        Nd4j.create(userArray).reshape(1, userArray.length),
-        Nd4j.create(itemArray).reshape(1, itemArray.length),
+        Nd4j.create(userV.toArray).reshape(1, userV.size),
+        Nd4j.create(itemV.toArray).reshape(1, itemV.size),
         Nd4j.create(la).reshape(1, 2))
     })
 
     //3.负样本数据
     logger.info("负样本数据")
+    val trainingItemSet = data.ratings.map(_.item).distinct.toSet
     val negativeData: Seq[(Int, INDArray, INDArray, INDArray)] = userHasItem.flatMap(r => {
+      //当前用户拥有的物品
       val userHadSet = r._2.map(_.item).distinct.toSet
-      //TODO 这里有bug，测试集的数据可能在里面
-      val negativeSet = allItemsSet.diff(userHadSet)
+      //未分割前的所有物品
+      val userHadAllSet = allUserItemSet(r._1)
+      //用户测试集中的物品
+      val userTestSet = userHadAllSet.diff(userHadSet)
+
+      val negativeSet = trainingItemSet.diff(userHadSet).diff(userTestSet)
       //保证负样本的数量，和正样本数量一致
-      val nSet = Random.shuffle(negativeSet).take(100)
+      val nSet = Random.shuffle(negativeSet).take(userHadSet.size)
 
       val userV = newUserVector(r._1)
 
       nSet.map(itemID => {
         val itemV = newItemVector(itemID)
 
-        val userArray = new Array[Float](userV.size)
-        for (idx <- 0 until userV.size) {
-          userArray(idx) = userV(idx).toFloat
-        }
-        val itemArray = new Array[Float](itemV.size)
-        for (idx <- 0 until itemV.size) {
-          itemArray(idx) = itemV(idx).toFloat
-        }
-
         //生成标签
-        val la = new Array[Float](2)
+        val la = new Array[Double](2)
         la(0) = 1
         la(1) = 0
         (Random.nextInt(size),
-          Nd4j.create(userArray).reshape(1, userArray.length),
-          Nd4j.create(itemArray).reshape(1, itemArray.length),
+          Nd4j.create(userV.toArray).reshape(1, userV.size),
+          Nd4j.create(itemV.toArray).reshape(1, itemV.size),
           Nd4j.create(la).reshape(1, 2))
       })
     }).toSeq
@@ -359,6 +357,9 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
 
   private var ncfModel: ComputationGraph = _
 
+
+  private var fw: FileWriter = _
+
   override def predict(query: Query): PredictedResult = {
     //1. 查看用户是否有相似度用户
     val userNearestRDD = nearestUser.filter(r => {
@@ -370,6 +371,11 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
       return PredictedResult(Array.empty)
     }
 
+    //2.用户的已经观看列表
+    val currentUserSawSet = userHasItem(query.user).map(_.item)
+    logger.info(s"已经观看的电影列表长度为:${currentUserSawSet.size}")
+
+
     //2. 获取推荐列表
     //用户相似度的Map
     val userNearestMap = userNearestRDD.filter(r => {
@@ -380,60 +386,43 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
       (uid.toInt, r._2)
     }).toSeq.sortBy(_._2).reverse.take(ap.numNearestUsers).toMap
 
-    logger.info(s"${query.user}的相似用户列表的长度为：${userNearestMap.size}")
 
-    //用户的已经观看列表
-    val currentUserSawSet = userHasItem(query.user).map(_.item)
-    logger.info(s"已经观看的列表长度为:${currentUserSawSet.size}")
-
-    var logN = 0
-    //筛选相近用户
-    val result = userLikedMap.filter(r => userNearestMap.contains(r._1)).
+    val candidateItems: Map[Int, Double] = userLikedMap
+      .filter(r => userNearestMap.contains(r._1))
       //生成用户的候选列表
-      flatMap(_._2).
+      .flatMap(_._2)
       //过滤已经看过的
-      filter(r => {
+      .filter(r => {
       currentUserSawSet.nonEmpty && !currentUserSawSet.contains(r.item)
-    }).
-      map(r => {
-        //r.rating
-        //r.item
-        //userNearestMap(r.user)
-        (r.item, r.rating * userNearestMap(r.user))
-      }).groupBy(_._1).map(r => {
+    })
+      // 计算评分与用户之间相似度的乘积
+      .map(r => {
+      (r.item, r.rating * userNearestMap(r.user))
+    }).groupBy(_._1).map(r => {
+      val scores = r._2.map(_._2).sum
+      (r._1, scores)
+    })
+
+
+    //筛选相近用户
+    val result = candidateItems.map(r => {
 
       //新增NCF筛选
       val userV = newUserVector(query.user)
       val itemV = newItemVector(r._1)
+
       //生成特征向量
-      val userArray = new Array[Float](userV.size)
-      for (idx <- 0 until userV.size) {
-        userArray(idx) = userV(idx).toFloat
-      }
-      val itemArray = new Array[Float](itemV.size)
-      for (idx <- 0 until itemV.size) {
-        itemArray(idx) = itemV(idx).toFloat
-      }
+      val vU = Nd4j.create(userV.toArray).reshape(1, userV.size)
+      val vI = Nd4j.create(itemV.toArray).reshape(1, itemV.size)
 
-
-      val vU = Nd4j.create(userArray).reshape(1, userArray.length)
-
-      val vI = Nd4j.create(itemArray).reshape(1, itemArray.length)
-
-      val start = System.currentTimeMillis()
       val vs: Array[INDArray] = ncfModel.output(vU, vI)
-      logger.info("计算所需时间：" + (System.currentTimeMillis() - start))
 
-      val sc = vs(0).getFloat(1)
-      if (logN < 2) {
-        logger.info(s"itemID:${r._1},正样例率:$sc,负样例率:${vs(0).getFloat(0)}")
-        logN += 1
-      }
+      val sc: Double = vs(0).getDouble(1L)
 
-      val itemid = r._1
-      val scores = r._2.map(_._2).sum * sc
-      (itemid, scores)
+      //(r._1, r._2 * sc)
+      (r._1, sc)
     })
+
     logger.info(s"生成的推荐列表的长度:${result.size}")
     val sum: Double = result.values.sum
     if (sum == 0) return PredictedResult(Array.empty)
@@ -443,9 +432,52 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
       ItemScore(r._1, r._2 / sum * weight)
     }).toArray.sortBy(_.score).reverse.take(query.num)
 
+
+    /**
+      * 调试信息
+      * 用于判断聚类产生候选物品的效果。
+      **/
+    //用户所有的物品，包含训练集和测试集中的物品
+    val myAllItems = allUserItemSet(query.user)
+
+    //测试集物品
+    val tSet = myAllItems.diff(currentUserSawSet.toSet)
+
+    val h500 = candidateItems.toSeq.sortBy(_._2).reverse.take(500)
+    val h400 = h500.take(400)
+    val h300 = h400.take(300)
+    val h200 = h300.take(200)
+    val h100 = h200.take(100)
+
+    val hit100 = h100.map(_._1).toSet.intersect(tSet)
+    logger.info(s"前100中，含有测试集数据的个数:${hit100.size}")
+    val hit200 = h200.map(_._1).toSet.intersect(tSet)
+    logger.info(s"前200中，含有测试集数据的个数:${hit200.size}")
+    val hit300 = h300.map(_._1).toSet.intersect(tSet)
+    logger.info(s"前300中，含有测试集数据的个数:${hit300.size}")
+    val hit400 = h400.map(_._1).toSet.intersect(tSet)
+    logger.info(s"前400中，含有测试集数据的个数:${hit400.size}")
+    val hit500 = h500.map(_._1).toSet.intersect(tSet)
+    logger.info(s"前500中，含有测试集数据的个数:${hit500.size}")
+
+
+    //候选集中包含测试集的数目
+    val iSet = candidateItems.map(_._1).toSet.intersect(tSet)
+    //推荐列表中的物品
+    val rSet = returnResult.map(_.item).toSet.intersect(tSet)
+    logger.info(s"测试集中物品数目：${tSet.size},候选集中命中数目:${iSet.size}，推荐列表中命中数目：${rSet.size}")
+
+    fw.append(s"${query.user},${hit100.size},${hit200.size},${hit300.size},${hit400.size},${hit500.size},${iSet.size},${rSet.size}\r\n")
+    fw.flush()
+
+
     //排序，返回结果
     PredictedResult(returnResult)
   }
 
+  override def finalize(): Unit = {
+    fw.close()
+    super.finalize()
+  }
 
 }
