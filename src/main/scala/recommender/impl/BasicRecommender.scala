@@ -13,13 +13,13 @@ import recommender.tools.Correlation
 
 import scala.collection.mutable
 
-case class BaseParams(method: String = "Cosine", commonThreashold: Int = 5, numNearestUsers: Int = 100, numUserLikeMovies: Int = 1000) extends Params {
+case class BasicParams(method: String = "Cosine", commonThreashold: Int = 5, numNearestUsers: Int = 100, numUserLikeMovies: Int = 1000) extends Params {
   override def toString: String = s"参数：{method:$method,commonThreashold:$commonThreashold,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}\r\n"
 
   override def getName(): String = s"${this.getClass.getSimpleName.replace("Params", "")}_$method"
 }
 
-class BaseRecommender(val ap: BaseParams) extends Recommender {
+class BasicRecommender(val ap: BasicParams) extends Recommender {
 
   private var nearestUsers: Map[Int, List[(Int, Double)]] = _
   private var usersLikeMovies: Map[Int, List[Rating]] = _

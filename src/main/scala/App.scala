@@ -15,7 +15,7 @@ object App {
     //runCluster()
     //runRandomClusterForest()
     runNCFCluster()
-    runNCF()
+    //runNCF()
     //runSAR()
     //runHot()
 
@@ -24,175 +24,295 @@ object App {
   def runBase(): Unit = {
     //1.生成参数列表
     val args = List(
-      //余弦相似度
+      /**
+        * method:Cosine,commonThreashold:2,numNearestUsers:5,numUserLikeMovies:5
+        * */
       // numUserLikeMovies测试 结论：5最高，但是列表有不足10的情况
       //BaseParams(commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.1458,召回率:0.0960,f1:0.0926,时间:1(ms)
-
+      /**
+        *commonThreashold=2,numNearestUsers=5,numUserLikeMovies=10
+        * */
       //BaseParams(commonThreashold=2,numNearestUsers=5,numUserLikeMovies=10),
       //准确率:0.1412,召回率:0.0987,f1:0.0951,时间:0(ms)
-
+      /**
+        *commonThreashold=2,numNearestUsers=5,numUserLikeMovies=20
+        * */
       //BaseParams(commonThreashold=2,numNearestUsers=5,numUserLikeMovies=20),
       //准确率:0.1396,召回率:0.0974,f1:0.0940,时间:1(ms)
-
+      /**
+        *commonThreashold=2,numNearestUsers=5,numUserLikeMovies=40
+        * */
       //BaseParams(commonThreashold=2,numNearestUsers=5,numUserLikeMovies=40),
       //准确率:0.1392,召回率:0.0970,f1:0.0936,时间:0(ms)
-
+      /**
+        *commonThreashold=2,numNearestUsers=5,numUserLikeMovies=80
+        * */
       //BaseParams(commonThreashold=2,numNearestUsers=5,numUserLikeMovies=80)
       //准确率:0.1392,召回率:0.0970,f1:0.0936,时间:0(ms)
-
+      /**
+        *commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //numNearestUsers测试 结论:5最高
       //BaseParams(commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.1458,召回率:0.0960,f1:0.0926,时间:0(ms)
-
+      /**
+        *commonThreashold=2,numNearestUsers=10,numUserLikeMovies=5
+        * */
       //BaseParams(commonThreashold=2,numNearestUsers=10,numUserLikeMovies=5),
       //准确率:0.1322,召回率:0.0923,f1:0.0888,时间:1(ms)
-
+      /**
+        *commonThreashold=2,numNearestUsers=20,numUserLikeMovies=5
+        * */
       //BaseParams(commonThreashold=2,numNearestUsers=20,numUserLikeMovies=5),
       //准确率:0.1195,召回率:0.0824,f1:0.0795,时间:1(ms)
-
+      /**
+        *commonThreashold=2,numNearestUsers=40,numUserLikeMovies=5
+        * */
       //BaseParams(commonThreashold=2,numNearestUsers=40,numUserLikeMovies=5),
       //准确率:0.1036,召回率:0.0671,f1:0.0666,时间:1(ms)
-
+      /**
+        *commonThreashold=2,numNearestUsers=80,numUserLikeMovies=5
+        * */
       //BaseParams(commonThreashold=2,numNearestUsers=80,numUserLikeMovies=5)
       //准确率:0.0901,召回率:0.0565,f1:0.0569,时间:1(ms)
-
+      /**
+        *commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //commonThreashold 结论：5最佳
       //BaseParams(commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.1458,召回率:0.0960,f1:0.0926,时间:1(ms)
-
+      /**
+        *commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //BaseParams(commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.1465,召回率:0.0969,f1:0.0934,时间:1(ms)
-
+      /**
+        *commonThreashold=10,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //BaseParams(commonThreashold=10,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.1456,召回率:0.0888,f1:0.0890,时间:1(ms)
-
+      /**
+        *commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //BaseParams(commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.1180,召回率:0.0480,f1:0.0598,时间:0(ms)
-
+      /**
+        *commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //BaseParams(commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5)
       //准确率:0.0820,召回率:0.0214,f1:0.0322,时间:0(ms)
+      /**
+        *
+        * 最优参数 commonThreashold = 5, numNearestUsers = 5, numUserLikeMovies = 5
+        * 准确率:0.1465,召回率:0.0969,f1:0.0934,时间:1(ms)
+        * */
 
-      //最优参数 commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
-      //准确率:0.1465,召回率:0.0969,f1:0.0934,时间:1(ms)
 
-
+      /**
+        *method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //AdjustCosine
       //numUserLikeMovies测试 结论：5最高
       //BaseParams(method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.1493,召回率:0.0935,f1:0.0931,时间:1(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=10
+        * */
       //BaseParams(method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=10),
       //准确率:0.1464,召回率:0.0994,f1:0.0967,时间:0(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=20
+        * */
       //BaseParams(method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=20),
       //准确率:0.1376,召回率:0.0922,f1:0.0903,时间:1(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=40
+        * */
       //BaseParams(method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=40),
       //准确率:0.1309,召回率:0.0891,f1:0.0864,时间:0(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=80
+        * */
       //BaseParams(method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=80),
       //准确率:0.1239,召回率:0.0862,f1:0.0829,时间:1(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //numNearestUsers测试 结论:5最高
       //BaseParams(method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.1493,召回率:0.0935,f1:0.0931,时间:0(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=5,numNearestUsers=10,numUserLikeMovies=5
+        * */
       //BaseParams(method = "AdjustCosine",commonThreashold=5,numNearestUsers=10,numUserLikeMovies=5),
       //准确率:0.1405,召回率:0.0966,f1:0.0937,时间:1(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=5,numNearestUsers=20,numUserLikeMovies=5
+        * */
       //BaseParams(method = "AdjustCosine",commonThreashold=5,numNearestUsers=20,numUserLikeMovies=5),
       //准确率:0.1291,召回率:0.0855,f1:0.0843,时间:1(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=5,numNearestUsers=40,numUserLikeMovies=5
+        * */
       //BaseParams(method = "AdjustCosine",commonThreashold=5,numNearestUsers=40,numUserLikeMovies=5),
       //准确率:0.1150,召回率:0.0722,f1:0.0731,时间:0(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=5,numNearestUsers=80,numUserLikeMovies=5
+        * */
       //BaseParams(method = "AdjustCosine",commonThreashold=5,numNearestUsers=80,numUserLikeMovies=5),
       //准确率:0.1010,召回率:0.0630,f1:0.0636,时间:1(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //commonThreashold 结论：5最佳
       //BaseParams(method = "AdjustCosine",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.1488,召回率:0.0923,f1:0.0924,时间:0(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //BaseParams(method = "AdjustCosine",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.1493,召回率:0.0935,f1:0.0931,时间:0(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=10,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //BaseParams(method = "AdjustCosine",commonThreashold=10,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.1450,召回率:0.0880,f1:0.0887,时间:0(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //BaseParams(method = "AdjustCosine",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.1200,召回率:0.0480,f1:0.0603,时间:0(ms)
-
+      /**
+        *method = "AdjustCosine",commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //BaseParams(method = "AdjustCosine",commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5)
       //准确率:0.0860,召回率:0.0220,f1:0.0331,时间:0(ms)
+      /**
+        *最优参数 commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
+        * 准确率:0.1493,召回率:0.0935,f1:0.0931,时间:0(ms)
+        * */
 
-      //最优参数 commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
-      //准确率:0.1493,召回率:0.0935,f1:0.0931,时间:0(ms)
 
 
       //Jaccard相似度
       //numUserLikeMovies测试 结论：5最高
+      /**
+        *method = "Jaccard",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5
+        * */
       //BaseParams(method = "Jaccard",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.1514,召回率:0.1060,f1:0.1029,时间:1(ms) */
+
       //BaseParams(method = "Jaccard",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=10),
+      /**准确率:0.1437,召回率:0.1045,f1:0.0994,时间:1(ms)  */
+
       //BaseParams(method = "Jaccard",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=20),
+      /**准确率:0.1383,召回率:0.0996,f1:0.0948,时间:1(ms)   */
+
       //BaseParams(method = "Jaccard",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=40),
+      /**准确率:0.1321,召回率:0.0967,f1:0.0911,时间:1(ms) */
+
       //BaseParams(method = "Jaccard",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=80),
+      /**准确率:0.1253,召回率:0.0949,f1:0.0885,时间:1(ms) */
+
       //numNearestUsers测试 结论:5最高
+
       //BaseParams(method = "Jaccard",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.1514,召回率:0.1060,f1:0.1029,时间:1(ms)  */
       //BaseParams(method = "Jaccard",commonThreashold=2,numNearestUsers=10,numUserLikeMovies=5),
+      /**准确率:0.1404,召回率:0.1001,f1:0.0966,时间:1(ms) */
       //BaseParams(method = "Jaccard",commonThreashold=2,numNearestUsers=20,numUserLikeMovies=5),
+      /**准确率:0.1273,召回率:0.0871,f1:0.0853,时间:1(ms)  */
       //BaseParams(method = "Jaccard",commonThreashold=2,numNearestUsers=40,numUserLikeMovies=5),
+      /**准确率:0.1112,召回率:0.0719,f1:0.0722,时间:1(ms) */
       //BaseParams(method = "Jaccard",commonThreashold=2,numNearestUsers=80,numUserLikeMovies=5),
+      /**准确率:0.0952,召回率:0.0602,f1:0.0605,时间:2(ms)  */
+
       //commonThreashold 结论：2最佳
       //BaseParams(method = "Jaccard",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.1514,召回率:0.1060,f1:0.1029,时间:1(ms) */
       //BaseParams(method = "Jaccard",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.1513,召回率:0.1060,f1:0.1028,时间:0(ms) */
       //BaseParams(method = "Jaccard",commonThreashold=10,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.1449,召回率:0.0957,f1:0.0952,时间:0(ms) */
       //BaseParams(method = "Jaccard",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.1150,召回率:0.0494,f1:0.0612,时间:0(ms) */
       //BaseParams(method = "Jaccard",commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5)
+      /**准确率:0.0840,召回率:0.0226,f1:0.0340,时间:0(ms) */
       //Jaccard总结：最优参数 commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5
       //准确率:0.1514,召回率:0.1060,f1:0.1029,时间:1(ms)
 
       //JaccardMSD相似度
       //numUserLikeMovies测试 结论：5最高
       //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.1392,召回率:0.0965,f1:0.0932,时间:1(ms) */
       //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=10),
+      /**准确率:0.1328,召回率:0.0934,f1:0.0897,时间:0(ms) */
       //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=20),
+      /**准确率:0.1285,召回率:0.0887,f1:0.0861,时间:0(ms) */
       //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=40),
+      /**准确率:0.1220,召回率:0.0850,f1:0.0820,时间:0(ms)  */
       //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=80),
+      /**准确率:0.1143,召回率:0.0825,f1:0.0786,时间:0(ms) */
       //numNearestUsers测试 结论:5最高
       //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.1392,召回率:0.0965,f1:0.0932,时间:0(ms) */
       //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=10,numUserLikeMovies=5),
+      /**准确率:0.1290,召回率:0.0888,f1:0.0863,时间:0(ms) */
       //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=20,numUserLikeMovies=5),
+      /**准确率:0.1182,召回率:0.0790,f1:0.0776,时间:0(ms) */
       //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=40,numUserLikeMovies=5),
+      /**准确率:0.1045,召回率:0.0674,f1:0.0671,时间:0(ms) */
       //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=80,numUserLikeMovies=5),
+      /**准确率:0.0903,召回率:0.0580,f1:0.0574,时间:1(ms) */
       //commonThreashold 结论：2最佳
       //BaseParams(method = "JaccardMSD",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.1392,召回率:0.0965,f1:0.0932,时间:0(ms) */
       //BaseParams(method = "JaccardMSD",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.1389,召回率:0.0959,f1:0.0928,时间:0(ms) */
       //BaseParams(method = "JaccardMSD",commonThreashold=10,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.1320,召回率:0.0836,f1:0.0844,时间:0(ms) */
       //BaseParams(method = "JaccardMSD",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.1067,召回率:0.0435,f1:0.0552,时间:0(ms) */
       //BaseParams(method = "JaccardMSD",commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5)
+      /**准确率:0.0800,召回率:0.0215,f1:0.0323,时间:0(ms) */
       //JaccardMSD总结：最优参数 commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5
       //准确率:0.1392,召回率:0.0965,f1:0.0932,时间:0(ms)
 
       //Pearson
       // numUserLikeMovies测试 结论：5最高
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.0858,召回率:0.0318,f1:0.0413,时间:1(ms) */
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=10),
+      /**准确率:0.0818,召回率:0.0315,f1:0.0403,时间:2(ms) */
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=20),
+      /**准确率:0.0771,召回率:0.0309,f1:0.0386,时间:2(ms) */
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=40),
+      /**准确率:0.0742,召回率:0.0297,f1:0.0371,时间:1(ms) */
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=80),
+      /**准确率:0.0707,召回率:0.0275,f1:0.0348,时间:1(ms) */
       //numNearestUsers测试 结论:5最高
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.0858,召回率:0.0318,f1:0.0413,时间:0(ms) */
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=10,numUserLikeMovies=5),
+      /**准确率:0.0816,召回率:0.0305,f1:0.0398,时间:0(ms) */
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=20,numUserLikeMovies=5),
+      /**准确率:0.0760,召回率:0.0286,f1:0.0372,时间:1(ms) */
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=40,numUserLikeMovies=5),
+      /**准确率:0.0708,召回率:0.0267,f1:0.0346,时间:2(ms) */
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=80,numUserLikeMovies=5),
+      /**准确率:0.0630,召回率:0.0243,f1:0.0312,时间:1(ms)  */
       //commonThreashold 结论：20最高
       //BaseParams(method = "Pearson",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.0404,召回率:0.0239,f1:0.0251,时间:1(ms) */
       //BaseParams(method = "Pearson",commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.0666,召回率:0.0405,f1:0.0411,时间:2(ms) */
       //BaseParams(method = "Pearson",commonThreashold=10,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.0856,召回率:0.0454,f1:0.0489,时间:1(ms) */
       //BaseParams(method = "Pearson",commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5),
+      /**准确率:0.0858,召回率:0.0318,f1:0.0413,时间:0(ms)  */
       //BaseParams(method = "Pearson",commonThreashold=40,numNearestUsers=5,numUserLikeMovies=5)
+      /**准确率:0.0753,召回率:0.0189,f1:0.0287,时间:0(ms) */
       //Pearson总结：最优参数 commonThreashold=20,numNearestUsers=5,numUserLikeMovies=5
       //准确率:0.0858,召回率:0.0318,f1:0.0413,时间:1(ms)
 
@@ -214,6 +334,7 @@ object App {
       //准确率:0.0434,召回率:0.0238,f1:0.0255,时间:3(ms)
 
       //numNearestUsers测试 结论:5最高
+
       //BaseParams(method = "ImprovedPearson",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.0464,召回率:0.0257,f1:0.0275,时间:1(ms)
 
@@ -230,6 +351,7 @@ object App {
       //准确率:0.0331,召回率:0.0164,f1:0.0183,时间:5(ms)
 
       //commonThreashold 结论：10最佳
+
       //BaseParams(method = "ImprovedPearson",commonThreashold=2,numNearestUsers=5,numUserLikeMovies=5),
       //准确率:0.0464,召回率:0.0257,f1:0.0275,时间:2(ms)
 
@@ -253,7 +375,7 @@ object App {
     //准确率:0.1514,召回率:0.1060,f1:0.1029,时间:1(ms)
 
     for (arg <- args) {
-      val recommender = new BaseRecommender(arg)
+      val recommender = new BasicRecommender(arg)
       val eval = new Evaluation()
       eval.run(recommender)
     }
@@ -263,7 +385,7 @@ object App {
     //1.生成参数列表
     val args = List(
 
-      /***------------------BisectingKMeans------------------***/
+      /** *------------------BisectingKMeans------------------ ***/
       //BisectingKMeans
       // k: 2 变化波动不太大
       //ClusterParams(clusterMethod = "BisectingKMeans", k = 2, maxIterations = 10),
@@ -335,7 +457,7 @@ object App {
       //最优参数：K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
       //最好结果：准确率:0.1833,召回率:0.1002,f1:0.1084,时间:94(ms)
 
-      /***------------------K-means------------------***/
+      /** *------------------K-means------------------ ***/
       //maxIterations:10
       //ClusterParams(clusterMethod = "K-means", k = 4, maxIterations = 5, numNearestUsers = 240, numUserLikeMovies = 240),
       //准确率:0.1839,召回率:0.1012,f1:0.1089,时间:102(ms)
@@ -371,7 +493,7 @@ object App {
       //K-means最优参数：k = 4, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240
       //准确率:0.1849,召回率:0.1014,f1:0.1092,时间:112(ms)
 
-      /***------------------GaussianMixture------------------***/
+      /** *------------------GaussianMixture------------------ ***/
       //GaussianMixture
       //k:2
       //ClusterParams(clusterMethod = "GaussianMixture", k = 2, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
@@ -412,10 +534,10 @@ object App {
 
   def runNCFCluster(): Unit = {
 
-    val args=List(
-      NCFClusterParams(maxIterations=10,numNearestUsers=240,numUserLikeMovies=240),
-      NCFClusterParams(method="ImprovedPearson", maxIterations=10,numNearestUsers=240,numUserLikeMovies=240),
-      NCFClusterParams(method="pearson", maxIterations=10,numNearestUsers=240,numUserLikeMovies=240)
+    val args = List(
+      NCFClusterParams(maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
+      NCFClusterParams(method = "ImprovedPearson", maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
+      NCFClusterParams(method = "pearson", maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240)
     )
     for (elem <- args) {
       val recommender = new NCFClusterRecommender(elem)
@@ -430,9 +552,9 @@ object App {
 
     val args = List(
       /** BisectingKMeans K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
-       *  cosine:commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
-       */
-      RandomForestClusterParams(k = 4,numNearestUsers = 240,numUserLikeMovies=240,maxIterationsCluster=10)//,
+        * 计算相似度方法:cosine:commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
+        */
+      //RandomForestClusterParams(k = 4,numNearestUsers = 240,numUserLikeMovies=240,maxIterationsCluster=10)//,
       //准确率:0.2176,召回率:0.1304,f1:0.1327,时间:102(ms)
 
 
@@ -446,9 +568,16 @@ object App {
         * RandomForestClusterParams:聚类部分：{邻近用户数量：240,numUserLikeMovies:240,计算相似度方法：pearson,
         * 聚类中心数量:4}
         * 随机森林部分：{最大迭代次数:20,分类数量:2,子数数量:5,子树分割策略:auto,impurity:gini,最大数深:5,maxBins:100}
-        * */
+        **/
       //RandomForestClusterParams(method = "pearson",k = 4,numNearestUsers = 240,numUserLikeMovies=240,maxIterationsCluster=10)
       //准确率:0.2170,召回率:0.1305,f1:0.1327,时间:113(ms)
+
+      //RandomForestClusterParams(numNearestUsers = 240, numUserLikeMovies = 240, maxIterationsCluster = 10, numTrees = 5),
+      /**准确率:0.2176,召回率:0.1304,f1:0.1327,时间:147(ms) */
+      //RandomForestClusterParams(numNearestUsers = 240, numUserLikeMovies = 240, maxIterationsCluster = 10, numTrees = 7),
+      /**准确率:0.2176,召回率:0.1304,f1:0.1327,时间:164(ms) */
+      //RandomForestClusterParams(numNearestUsers = 240, numUserLikeMovies = 240, maxIterationsCluster = 10, numTrees = 9)
+      /**准确率:0.2176,召回率:0.1303,f1:0.1327,时间:152(ms)  */
     )
     for (elem <- args) {
       val recommender = new RandomForestClusterRecommender(elem)

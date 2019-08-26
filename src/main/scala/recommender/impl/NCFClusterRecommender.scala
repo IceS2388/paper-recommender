@@ -25,6 +25,7 @@ import org.deeplearning4j.nn.graph.ComputationGraph
 import org.nd4j.linalg.activations.Activation
 import org.nd4j.linalg.api.ndarray.INDArray
 import org.nd4j.linalg.factory.Nd4j
+import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction
 import org.slf4j.{Logger, LoggerFactory}
 import recommender._
 import recommender.tools.{Correlation, NearestUserAccumulator}
@@ -196,13 +197,14 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
       .addLayer("userLayer", new DenseLayer.Builder().nIn(userVS).nOut(userVS).activation(Activation.IDENTITY).build(), "user_input")
       .addLayer("itemLayer", new DenseLayer.Builder().nIn(itemVS).nOut(itemVS).activation(Activation.IDENTITY).build(), "item_input")
       .addLayer("GML", new ElementWiseMultiplicationLayer.Builder().nIn(unionSize).nOut(unionSize).build(), "userLayer", "itemLayer")
-
       .addVertex("input", new MergeVertex(), "userLayer", "itemLayer")
-      .addLayer("MLP4", new DenseLayer.Builder().nIn(unionSize).nOut(4 * unionSize).build(), "input")
+      .addLayer("MLP16", new DenseLayer.Builder().nIn(unionSize).nOut(16 * unionSize).build(), "input")
+      .addLayer("MLP8", new DenseLayer.Builder().nIn(16 * unionSize).nOut(8 * unionSize).build(), "MLP16")
+      .addLayer("MLP4", new DenseLayer.Builder().nIn(8 * unionSize).nOut(4 * unionSize).build(), "MLP8")
       .addLayer("MLP2", new DenseLayer.Builder().nIn(4 * unionSize).nOut(2 * unionSize).build(), "MLP4")
       .addLayer("MLP1", new DenseLayer.Builder().activation(Activation.SIGMOID).nIn(2 * unionSize).nOut(unionSize).build(), "MLP2")
       .addVertex("ncf", new MergeVertex(), "GML", "MLP1")
-      .addLayer("out", new OutputLayer.Builder().nIn(unionSize + unionSize).activation(Activation.SOFTMAX).nOut(2).build(), "ncf")
+      .addLayer("out", new OutputLayer.Builder(LossFunction.XENT).nIn(unionSize + unionSize).activation(Activation.SIGMOID).nOut(1).build(), "ncf")
       .setOutputs("out")
       .build()
 
@@ -221,14 +223,14 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
       val itemV: linalg.Vector = newItemVector(r.item)
 
       //生成标签
-      val la = new Array[Double](2)
-      la(0) = 0
-      la(1) = 1
+      val la = new Array[Double](1)
+      la(0) = 1
+
 
       (Random.nextInt(size),
         Nd4j.create(userV.toArray).reshape(1, userV.size),
         Nd4j.create(itemV.toArray).reshape(1, itemV.size),
-        Nd4j.create(la).reshape(1, 2))
+        Nd4j.create(la).reshape(1, 1))
     })
 
     //3.负样本数据
@@ -252,13 +254,13 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
         val itemV = newItemVector(itemID)
 
         //生成标签
-        val la = new Array[Double](2)
-        la(0) = 1
-        la(1) = 0
+        val la = new Array[Double](1)
+        la(0) = 0
+
         (Random.nextInt(size),
           Nd4j.create(userV.toArray).reshape(1, userV.size),
           Nd4j.create(itemV.toArray).reshape(1, itemV.size),
-          Nd4j.create(la).reshape(1, 2))
+          Nd4j.create(la).reshape(1, 1))
       })
     }).toSeq
 
@@ -373,7 +375,6 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
 
     //2.用户的已经观看列表
     val currentUserSawSet = userHasItem(query.user).map(_.item)
-    logger.info(s"已经观看的电影列表长度为:${currentUserSawSet.size}")
 
 
     //2. 获取推荐列表
@@ -387,7 +388,7 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
     }).toSeq.sortBy(_._2).reverse.take(ap.numNearestUsers).toMap
 
 
-    val candidateItems: Map[Int, Double] = userLikedMap
+    val candidateItems = userLikedMap
       .filter(r => userNearestMap.contains(r._1))
       //生成用户的候选列表
       .flatMap(_._2)
@@ -401,7 +402,7 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
     }).groupBy(_._1).map(r => {
       val scores = r._2.map(_._2).sum
       (r._1, scores)
-    })
+    }).toSeq.sortBy(_._2).reverse.take(400)
 
 
     //筛选相近用户
@@ -417,14 +418,13 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
 
       val vs: Array[INDArray] = ncfModel.output(vU, vI)
 
-      val sc: Double = vs(0).getDouble(1L)
+      val sc: Double = vs(0).getDouble(0L)
 
-      //(r._1, r._2 * sc)
-      (r._1, sc)
+      (r._1, r._2 * sc)
     })
 
-    logger.info(s"生成的推荐列表的长度:${result.size}")
-    val sum: Double = result.values.sum
+    //logger.info(s"生成的推荐列表的长度:${result.size}")
+    val sum: Double = result.map(_._2).sum
     if (sum == 0) return PredictedResult(Array.empty)
 
     val weight = 1.0
@@ -457,8 +457,6 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
     logger.info(s"前300中，含有测试集数据的个数:${hit300.size}")
     val hit400 = h400.map(_._1).toSet.intersect(tSet)
     logger.info(s"前400中，含有测试集数据的个数:${hit400.size}")
-    val hit500 = h500.map(_._1).toSet.intersect(tSet)
-    logger.info(s"前500中，含有测试集数据的个数:${hit500.size}")
 
 
     //候选集中包含测试集的数目
@@ -467,7 +465,7 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
     val rSet = returnResult.map(_.item).toSet.intersect(tSet)
     logger.info(s"测试集中物品数目：${tSet.size},候选集中命中数目:${iSet.size}，推荐列表中命中数目：${rSet.size}")
 
-    fw.append(s"${query.user},${hit100.size},${hit200.size},${hit300.size},${hit400.size},${hit500.size},${iSet.size},${rSet.size}\r\n")
+    fw.append(s"${query.user},${hit100.size},${hit200.size},${hit300.size},${hit400.size},${iSet.size},${rSet.size}\r\n")
     fw.flush()
 
 
