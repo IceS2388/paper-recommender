@@ -11,14 +11,27 @@ object App {
 
   def main(args: Array[String]): Unit = {
 
+    runSARCluster()
     //runBase()
     //runCluster()
     //runRandomClusterForest()
-    runNCFCluster()
+    //runNCFCluster()
     //runNCF()
     //runSAR()
     //runHot()
 
+  }
+
+  def runSARCluster():Unit={
+    val args = List(
+      //最优参数：K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
+      SARClusterParams(k=4,maxIterations = 10,numNearestUsers = 240,numUserLikeMovies = 240)
+    )
+    for (elem <- args) {
+      val recommender = new SARClusterRecommender(elem)
+      val eval = new Evaluation()
+      eval.run(recommender)
+    }
   }
 
   def runBase(): Unit = {
@@ -449,18 +462,18 @@ object App {
       //准确率:0.1825,召回率:0.0997,f1:0.1077,时间:84(ms)
       //ClusterParams(clusterMethod = "BisectingKMeans", k = 4, maxIterations = 10,numNearestUsers=240,numUserLikeMovies=200),
       //准确率:0.1829,召回率:0.1001,f1:0.1081,时间:86(ms)
-      //ClusterParams(clusterMethod = "BisectingKMeans", k = 4, maxIterations = 10,numNearestUsers=240,numUserLikeMovies=240),
+      ClusterParams(clusterMethod = "BisectingKMeans", k = 4, maxIterations = 10,numNearestUsers=240,numUserLikeMovies=240)//,
       //准确率:0.1833,召回率:0.1002,f1:0.1084,时间:94(ms)
       //ClusterParams(clusterMethod = "BisectingKMeans", k = 4, maxIterations = 10,numNearestUsers=240,numUserLikeMovies=280)
-      //准确率:0.1833,召回率:0.1005,f1:0.1086,时间:95(ms)
+      /**准确率:0.2175,召回率:0.1301,f1:0.1327,时间:459(ms) */
 
-      //最优参数：K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
-      //最好结果：准确率:0.1833,召回率:0.1002,f1:0.1084,时间:94(ms)
+      /** 最优参数：K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
+       * 最好结果：准确率:0.2175,召回率:0.1301,f1:0.1327,时间:459(ms)*/
 
       /** *------------------K-means------------------ ***/
       //maxIterations:10
-      //ClusterParams(clusterMethod = "K-means", k = 4, maxIterations = 5, numNearestUsers = 240, numUserLikeMovies = 240),
-      //准确率:0.1839,召回率:0.1012,f1:0.1089,时间:102(ms)
+      //ClusterParams(clusterMethod = "K-means", k = 4, maxIterations = 5, numNearestUsers = 240, numUserLikeMovies = 240)//,
+      /**准确率:0.2165,召回率:0.1285,f1:0.1317,时间:92(ms) */
 
       //ClusterParams(clusterMethod = "K-means", k = 4, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
       //准确率:0.1849,召回率:0.1014,f1:0.1092,时间:112(ms)
@@ -501,7 +514,7 @@ object App {
       //ClusterParams(clusterMethod = "GaussianMixture", k = 3, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
       //准确率:0.1861,召回率:0.0971,f1:0.1070,时间:302(ms)
       //ClusterParams(clusterMethod = "GaussianMixture", k = 4, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
-      //准确率:0.1858,召回率:0.0970,f1:0.1069,时间:186(ms)
+      /**准确率:0.2140,召回率:0.1275,f1:0.1305,时间:92(ms) */
       //ClusterParams(clusterMethod = "GaussianMixture", k = 5, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
       //准确率:0.1858,召回率:0.0966,f1:0.1066,时间:187(ms)
       //ClusterParams(clusterMethod = "GaussianMixture", k = 6, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
@@ -535,9 +548,9 @@ object App {
   def runNCFCluster(): Unit = {
 
     val args = List(
-      NCFClusterParams(maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
-      NCFClusterParams(method = "ImprovedPearson", maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
-      NCFClusterParams(method = "pearson", maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240)
+      NCFClusterParams(maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240)//,
+      //NCFClusterParams(method = "ImprovedPearson", maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
+      //NCFClusterParams(method = "pearson", maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240)
     )
     for (elem <- args) {
       val recommender = new NCFClusterRecommender(elem)
@@ -554,7 +567,7 @@ object App {
       /** BisectingKMeans K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
         * 计算相似度方法:cosine:commonThreashold=5,numNearestUsers=5,numUserLikeMovies=5
         */
-      //RandomForestClusterParams(k = 4,numNearestUsers = 240,numUserLikeMovies=240,maxIterationsCluster=10)//,
+      RandomForestClusterParams(k = 4,numNearestUsers = 240,numUserLikeMovies=240,maxIterationsCluster=10)//,
       //准确率:0.2176,召回率:0.1304,f1:0.1327,时间:102(ms)
 
 

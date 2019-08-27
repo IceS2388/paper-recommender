@@ -13,16 +13,30 @@ import recommender.tools.Correlation
 
 import scala.collection.mutable
 
-case class BasicParams(method: String = "Cosine", commonThreashold: Int = 5, numNearestUsers: Int = 100, numUserLikeMovies: Int = 1000) extends Params {
-  override def toString: String = s"参数：{method:$method,commonThreashold:$commonThreashold,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}\r\n"
+case class BasicParams(//计算相似度的方法
+                       method: String = "Cosine",
+                       //计算用户之间相似度的共同评分电影的阀值
+                       commonThreashold: Int = 5,
+                       //最近邻用户的个数
+                       numNearestUsers: Int = 100,
+                       //用户喜欢的电影列表长度
+                       numUserLikeMovies: Int = 1000) extends Params {
+  override def toString: String = {
+    s"参数：{method:$method,commonThreashold:$commonThreashold,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}\r\n"
+  }
 
-  override def getName(): String = s"${this.getClass.getSimpleName.replace("Params", "")}_$method"
+  override def getName(): String = {
+    s"${this.getClass.getSimpleName.replace("Params", "")}_$method"
+  }
 }
 
 class BasicRecommender(val ap: BasicParams) extends Recommender {
 
+  //最近邻用户列表
   private var nearestUsers: Map[Int, List[(Int, Double)]] = _
+  //用户喜欢电影列表
   private var usersLikeMovies: Map[Int, List[Rating]] = _
+  //用户已经观看电影的列表
   private var userWatchedItem: Map[Int, Seq[Rating]] = _
 
   @transient private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -47,19 +61,15 @@ class BasicRecommender(val ap: BasicParams) extends Recommender {
 
   }
 
-  private def getUsersLikeMovies(userRatings: Map[Int, Seq[Rating]]) = {
-    //2.从用户的观看记录中选择用户喜欢的电影,用于后续的用户与用户之间的推荐
+  private def getUsersLikeMovies(userRatings: Map[Int, Seq[Rating]]):Map[Int,List[Rating]] = {
+    //从用户的观看记录中选择用户喜欢的电影,用于后续的用户与用户之间的推荐
     val userLikesBeyondMean = userRatings.map(r => {
-
       //当前用户的平均评分
-      val count = r._2.size
       val mean = r._2.map(_.rating).sum / r._2.size
 
       //用户浏览的小于numNearst，全部返回
       val userLikes = r._2.filter(r => r.rating > mean).toList.sortBy(_.rating).reverse.take(ap.numUserLikeMovies)
 
-      //userLikes.foreach(println)
-      //Thread.sleep(1000)
       (r._1, userLikes)
     })
 

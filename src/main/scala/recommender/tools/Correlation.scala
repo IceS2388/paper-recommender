@@ -117,16 +117,16 @@ object Correlation {
   }
 
   def getJaccard(threashold: Int,
-                 key1: Int,
-                 key2: Int,
-                 userHashRatings: Map[Int, Seq[Rating]]): Double = {
-    if (!userHashRatings.contains(key1) || !userHashRatings.contains(key2)) {
+                 userId1: Int,
+                 userId2: Int,
+                 userHasRatings: Map[Int, Seq[Rating]]): Double = {
+    if (!userHasRatings.contains(userId1) || !userHasRatings.contains(userId2)) {
       //不相关
       return 0D
     }
 
-    val user1Data = userHashRatings(key1)
-    val user2Data = userHashRatings(key2)
+    val user1Data = userHasRatings(userId1)
+    val user2Data = userHasRatings(userId2)
 
     //1.求u1与u2共同的物品ID
     val comItemSet = user1Data.map(r => r.item).toSet.intersect(user2Data.map(r => r.item).toSet)
@@ -140,16 +140,16 @@ object Correlation {
   }
 
   def getJaccardMSD(threashold: Int,
-                    userid1: Int,
-                    userid2: Int,
-                    userHashRatings: Map[Int, Seq[Rating]]): Double = {
-    if (!userHashRatings.contains(userid1) || !userHashRatings.contains(userid2)) {
+                    userID1: Int,
+                    userID2: Int,
+                    userHasRatings: Map[Int, Seq[Rating]]): Double = {
+    if (!userHasRatings.contains(userID1) || !userHasRatings.contains(userID2)) {
       //不相关
       return 0D
     }
 
-    val user1Data: Iterable[Rating] = userHashRatings(userid1)
-    val user2Data: Iterable[Rating] = userHashRatings(userid2)
+    val user1Data: Iterable[Rating] = userHasRatings(userID1)
+    val user2Data: Iterable[Rating] = userHasRatings(userID2)
 
     //1.求u1与u2共同的物品ID
     val comItemSet = user1Data.map(r => r.item).toSet.intersect(user2Data.map(r => r.item).toSet)
@@ -166,27 +166,26 @@ object Correlation {
     val differ = comItems.map(r => {
       Math.pow(r._2._1 - r._2._2, 2)
     }).sum
-    val msd = 1 - differ * 1.0 / comItems.size
 
+    val msd = 1 - differ * 1.0 / comItems.size
     val jaccard = comItems.size * 1.0 / (user1Data.size + user2Data.size - comItems.size)
 
     msd * jaccard
-
   }
 
   //修正的Cosine相似度
   def getAdjustCosine(threashold: Int,
-                      userid1: Int,
-                      userid2: Int,
-                      userHashRatings: Map[Int, Seq[Rating]]): Double = {
+                      userID1: Int,
+                      userID2: Int,
+                      userHasRatings: Map[Int, Seq[Rating]]): Double = {
 
-    if (!userHashRatings.contains(userid1) || !userHashRatings.contains(userid2)) {
+    if (!userHasRatings.contains(userID1) || !userHasRatings.contains(userID2)) {
       //不相关
       return 0D
     }
 
-    val user1Data: Iterable[Rating] = userHashRatings(userid1)
-    val user2Data: Iterable[Rating] = userHashRatings(userid2)
+    val user1Data: Iterable[Rating] = userHasRatings(userID1)
+    val user2Data: Iterable[Rating] = userHasRatings(userID2)
 
     //1.求u1与u2共同的物品ID
     val comItemSet = user1Data.map(r => r.item).toSet.intersect(user2Data.map(r => r.item).toSet)
@@ -198,17 +197,12 @@ object Correlation {
     //求两者的并集
     val allItems = user1Data.map(r => r.item).toSet ++ user2Data.map(r => r.item).toSet
 
-
-    //计算平均值和标准差
-    val sum1 = user1Data.map(_.rating).sum
-    val sum2 = user2Data.map(_.rating).sum
     //平均值
-    val x_mean = sum1 / user1Data.size
-    val y_mean = sum2 / user2Data.size
+    val x_mean = user1Data.map(_.rating).sum / user1Data.size
+    val y_mean = user2Data.map(_.rating).sum / user2Data.size
 
     val user1ItemData = user1Data.map(r => (r.item, r.rating)).toMap
     val user2ItemData = user2Data.map(r => (r.item, r.rating)).toMap
-
 
     var xy = 0D
     var x_var = 0D
@@ -234,22 +228,20 @@ object Correlation {
     })
 
     xy / Math.sqrt(x_var * y_var)
-
-
   }
 
   def getCosine(threashold: Int,
-                userid1: Int,
-                userid2: Int,
-                userHashRatings: Map[Int, Seq[Rating]]): Double = {
+                userID1: Int,
+                userID2: Int,
+                userHasRatings: Map[Int, Seq[Rating]]): Double = {
 
-    if (!userHashRatings.contains(userid1) || !userHashRatings.contains(userid2)) {
+    if (!userHasRatings.contains(userID1) || !userHasRatings.contains(userID2)) {
       //不相关
       return 0D
     }
 
-    val user1Data: Iterable[Rating] = userHashRatings(userid1)
-    val user2Data: Iterable[Rating] = userHashRatings(userid2)
+    val user1Data: Iterable[Rating] = userHasRatings(userID1)
+    val user2Data: Iterable[Rating] = userHasRatings(userID2)
 
     //1.求u1与u2共同的物品ID
     val comItemSet = user1Data.map(r => r.item).toSet.intersect(user2Data.map(r => r.item).toSet)
@@ -276,7 +268,6 @@ object Correlation {
     val x_var = user1Data.map(r => Math.pow(r.rating, 2)).sum
     val y_var = user2Data.map(r => Math.pow(r.rating, 2)).sum
 
-
     //Cosine系数
     xy / Math.sqrt(x_var * y_var)
   }
@@ -289,17 +280,17 @@ object Correlation {
     * 增加评分差距因子。2019年7月26日
     **/
   def getPearson(threashold: Int,
-                 userid1: Int,
-                 userid2: Int,
-                 userHashRatings: Map[Int, Seq[Rating]]): Double = {
+                 userID1: Int,
+                 userID2: Int,
+                 userHasRatings: Map[Int, Seq[Rating]]): Double = {
 
-    if (!userHashRatings.contains(userid1) || !userHashRatings.contains(userid2)) {
+    if (!userHasRatings.contains(userID1) || !userHasRatings.contains(userID2)) {
       //不相关
       return 0D
     }
 
-    val user1Data: Iterable[Rating] = userHashRatings(userid1)
-    val user2Data: Iterable[Rating] = userHashRatings(userid2)
+    val user1Data: Iterable[Rating] = userHasRatings(userID1)
+    val user2Data: Iterable[Rating] = userHasRatings(userID2)
 
     //1.求u1与u2共同的物品ID
     val comItemSet = user1Data.map(r => r.item).toSet.intersect(user2Data.map(r => r.item).toSet)
@@ -316,7 +307,6 @@ object Correlation {
     val x_mean = sum1 / user1Data.size
     val y_mean = sum2 / user2Data.size
 
-
     val user1ComData = user1Data.filter(r => comItemSet.contains(r.item)).map(r => (r.item, r.rating)).toMap
     val user2ComData = user2Data.filter(r => comItemSet.contains(r.item)).map(r => (r.item, r.rating)).toMap
 
@@ -332,9 +322,9 @@ object Correlation {
       //         item  u1_rating u2_rating
       //val t: (String, (Double, Double))
 
-      //计算Pearson系数
       val x_vt = i._2._1 - x_mean
       val y_vt = i._2._2 - y_mean
+
       xy += x_vt * y_vt
 
       x_var += (x_vt * x_vt)

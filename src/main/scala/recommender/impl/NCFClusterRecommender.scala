@@ -7,11 +7,6 @@ package recommender.impl
   * 结合NCF和Cluster集群算法
   */
 
-import java.io.FileWriter
-import java.nio.file.Paths
-import java.text.SimpleDateFormat
-import java.util.Date
-
 import org.apache.spark.mllib.clustering.BisectingKMeans
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.Vectors
@@ -66,9 +61,9 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
 
   override def prepare(data: Seq[Rating]): PrepairedData = {
 
-    val hitFile = Paths.get("spark-warehouse", s"hitRecord_${new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date)}.txt").toFile()
+    //val hitFile = Paths.get("spark-warehouse", s"hitRecord_${new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date)}.txt").toFile()
 
-    fw = new FileWriter(hitFile)
+    //fw = new FileWriter(hitFile)
 
     allUserItemSet = data.groupBy(_.user).map(r => {
       val userId = r._1
@@ -360,7 +355,7 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
   private var ncfModel: ComputationGraph = _
 
 
-  private var fw: FileWriter = _
+  //private var fw: FileWriter = _
 
   override def predict(query: Query): PredictedResult = {
     //1. 查看用户是否有相似度用户
@@ -436,7 +431,7 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
     /**
       * 调试信息
       * 用于判断聚类产生候选物品的效果。
-      **/
+
     //用户所有的物品，包含训练集和测试集中的物品
     val myAllItems = allUserItemSet(query.user)
 
@@ -467,14 +462,14 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
 
     fw.append(s"${query.user},${hit100.size},${hit200.size},${hit300.size},${hit400.size},${iSet.size},${rSet.size}\r\n")
     fw.flush()
-
+      **/
 
     //排序，返回结果
     PredictedResult(returnResult)
   }
 
   override def finalize(): Unit = {
-    fw.close()
+    //fw.close()
     super.finalize()
   }
 

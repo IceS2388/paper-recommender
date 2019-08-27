@@ -72,7 +72,7 @@ class SARRecommender(ap: SARParams) extends Recommender {
     resultMatrix = affinityMatrix * itemToItemMatrix
     logger.info(s"A.rows:${affinityMatrix.rows},A.columns:${affinityMatrix.cols} B.rows:${itemToItemMatrix.rows},B.columns:${itemToItemMatrix.cols}")
     logger.info(s"R.rows:${resultMatrix.rows},R.columns:${resultMatrix.cols}")
-    Thread.sleep(5000)
+
   }
 
   private var resultMatrix: DenseMatrix[Float] = _

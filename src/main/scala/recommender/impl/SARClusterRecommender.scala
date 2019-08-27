@@ -1,28 +1,23 @@
 package recommender.impl
 
+import breeze.linalg.DenseMatrix
 import org.apache.spark.mllib.clustering.{BisectingKMeans, GaussianMixture, KMeans}
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.sql.SparkSession
 import org.slf4j.{Logger, LoggerFactory}
 import recommender._
-import recommender.tools.{Correlation, NearestUserAccumulator}
+import recommender.tools.{BiMap, Correlation, NearestUserAccumulator}
 
 import scala.collection.mutable
 
-/**
-  * Author:IceS
-  * Date:2019-08-10 23:27:26
-  * Description:
-  * 这个类的重点是测试聚类算法
-  */
-case class ClusterParams(
-                          clusterMethod: String = "BisectingKMeans",
-                          k: Int = 2,
-                          maxIterations: Int = 20,
-                          method: String = "Cosine",
-                          numNearestUsers: Int = 5,
-                          numUserLikeMovies: Int = 5) extends Params {
+case class SARClusterParams(
+                             clusterMethod: String = "BisectingKMeans",
+                             k: Int = 2,
+                             maxIterations: Int = 20,
+                             method: String = "Cosine",
+                             numNearestUsers: Int = 5,
+                             numUserLikeMovies: Int = 5) extends Params {
   override def getName(): String = {
     this.getClass.getSimpleName.replace("Params", "") + s"_$clusterMethod"
   }
@@ -30,8 +25,13 @@ case class ClusterParams(
   override def toString: String = s"聚类{聚类方法：$clusterMethod,簇心数量:$k,maxIterations:$maxIterations,相似度方法:$method,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}\r\n"
 }
 
-
-class ClusterRecommender(ap: ClusterParams) extends Recommender {
+/**
+  * Author:IceS
+  * Date:2019-08-27 15:22:20
+  * Description:
+  * NONE
+  */
+class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
   @transient private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   override def getParams: Params = ap
@@ -49,6 +49,8 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
     new PrepairedData(data)
   }
 
+  private var itemsGroup: Map[Int, Set[Int]] = _
+
   override def train(data: TrainingData): Unit = {
 
     require(data.ratings.nonEmpty, "训练数据不能为空！")
@@ -56,6 +58,8 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
 
     //1.获取训练集中每个用户的观看列表
     userHasItem = data.ratings.groupBy(_.user)
+    //2.物品分组
+    itemsGroup = data.ratings.groupBy(_.item).map(r => (r._1, r._2.map(_.user).toSet))
 
     //实现新的统计方法
     val userVectors = userHasItem.map(r => {
@@ -79,7 +83,7 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
           c5 += 1
       })
 
-      (uid, Vectors.dense(c1 , c2 , c3 , c4 , c5 ))
+      (uid, Vectors.dense(c1, c2, c3, c4, c5))
     }).toSeq
 
 
@@ -235,42 +239,74 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
       (uid.toInt, r._2)
     }).toSeq.sortBy(_._2).reverse.take(ap.numNearestUsers).toMap
 
-    //logger.info(s"${query.user}的相似用户列表的长度为：${userNearestMap.size}")
 
     //用户的已经观看列表
-    val currentUserSawSet = userHasItem(query.user).map(_.item)
+    val currentUserSawSet = userHasItem(query.user).map(_.item).toSet
     logger.info(s"已经观看的列表长度为:${currentUserSawSet.size}")
 
-    val result = userLikedMap.
+    //计算候选列表中，用户未观看的推荐度最高的前400个电影
+    val candidateMovies = userLikedMap.
       //在所有用户的喜欢列表中,查找当前用户的邻近用户相关的
       filter(r => userNearestMap.contains(r._1)).
       //提取出每个用户的喜欢的评分列表
-      flatMap(_._2).
-      //过滤已经看过的
-      filter(r => {
+      flatMap(_._2).filter(r => {
       currentUserSawSet.nonEmpty && !currentUserSawSet.contains(r.item)
-    }).
-      map(r => {
-        //评分乘以相似度
-        //r.rating
-        //r.item
-        //userNearestMap(r.user)
-        (r.item, r.rating * userNearestMap(r.user))
-      }).groupBy(_._1).map(r => {
-      val itemid = r._1
-      val scores = r._2.map(_._2).sum
-      //logger.info(s"累加的相似度：${scores},物品的评论数量:${itemCountSeq(r._1)}")
-      (itemid, scores)
     })
+      //计算每个item相似度权重
+      .map(r => {
+      //r.rating
+      //r.item
+      //userNearestMap(r.user)
+      (r.item, r.rating * userNearestMap(r.user))
+    }) //聚合同一item的权重
+      .groupBy(_._1)
+      .map(r => {
+        val itemid = r._1
+        val scores = r._2.map(_._2).sum
+        (itemid, scores)
+      }).toArray.sortBy(_._2).reverse.take(400).map(_._1).toSet
 
-    logger.info(s"生成候选物品列表的长度为：${result.size}")
-    val sum: Double = result.values.sum
+
+    //对应候选列表的索引
+    val candidateItems2Index = BiMap.toIndex(candidateMovies)
+    val sawItems2Index = BiMap.toIndex(currentUserSawSet)
+
+    //1.生成用户关联矩阵
+    val affinityMatrix = DenseMatrix.ones[Float](1, currentUserSawSet.size)
+
+    //2.生成item2item的相似度矩阵
+    val itemToItemMatrix: DenseMatrix[Float] = DenseMatrix.zeros[Float](currentUserSawSet.size, candidateMovies.size)
+
+    //赋予矩阵相似度值
+    for {
+      sawID <- currentUserSawSet
+      cID <- candidateMovies
+    } {
+      val s = Correlation.getJaccardSAR(1, sawID, cID, itemsGroup).toFloat
+
+      val index1 = sawItems2Index(sawID).toInt
+      val index2 = candidateItems2Index(cID).toInt
+      itemToItemMatrix.update(index1, index2, s)
+    }
+
+    val resultMatrix = affinityMatrix * itemToItemMatrix
+    val row = resultMatrix(0, ::)
+
+    val indexToItem: BiMap[Long, Int] = candidateItems2Index.inverse
+
+
+    val result = indexToItem.toSeq.map(r => {
+      (r._2, row.apply(r._1.toInt))
+    }).sortBy(_._2).reverse.take(query.num)
+
+
+    val sum: Double = result.map(_._2).sum
     if (sum == 0) return PredictedResult(Array.empty)
 
     val weight = 1.0
     val returnResult = result.map(r => {
       ItemScore(r._1, r._2 / sum * weight)
-    }).toArray.sortBy(_.score).reverse.take(query.num)
+    }).toArray
 
     //排序，返回结果
     PredictedResult(returnResult)
@@ -278,5 +314,3 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
 
 
 }
-
-
