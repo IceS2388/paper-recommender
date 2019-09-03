@@ -278,6 +278,7 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
     val itemToItemMatrix: DenseMatrix[Float] = DenseMatrix.zeros[Float](currentUserSawSet.size, candidateMovies.size)
 
     //赋予矩阵相似度值
+    //这个过程比较费时间
     for {
       sawID <- currentUserSawSet
       cID <- candidateMovies

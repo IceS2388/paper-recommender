@@ -93,6 +93,7 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
 
     //选择聚类算法
     if (ap.clusterMethod.toLowerCase() == "BisectingKMeans".toLowerCase) {
+      //二分k-means
       val bkm = new BisectingKMeans().setK(ap.k).setMaxIterations(ap.maxIterations)
       val model = bkm.run(dtrain)
 
@@ -102,11 +103,12 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
       val WSSSE = model.computeCost(dtrain)
       logger.info(s"数据集内偏差的误差平方和：$WSSSE")
       throw new Exception("集群偏差测试")*/
-
+      //对新用户特征向量进行簇分类
       afterClusterRDD = userVectors.map(r => {
         (model.predict(r._2), r)
       })
     } else if (ap.clusterMethod.toLowerCase() == "K-means".toLowerCase) {
+      //k-means II
       val clusters = KMeans.train(dtrain, ap.k, ap.maxIterations)
 
       /*//调试信息
@@ -115,21 +117,21 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
       logger.info(s"数据集内偏差的误差平方和：$WSSSE")
       Thread.sleep(5000)*/
 
-
+      //对新用户特征向量进行簇分类
       afterClusterRDD = userVectors.map(r => {
         (clusters.predict(r._2), r)
       })
     } else if (ap.clusterMethod.toLowerCase() == "GaussianMixture".toLowerCase()) {
+      //高斯
       val gmm = new GaussianMixture().setK(ap.k).run(dtrain)
 
-      //调试信息
+     /* //调试信息
       //查看集合内偏差的误差平方和
       for (i <- 0 until gmm.k) {
         println("weight=%f\nmu=%s\nsigma=\n%s\n" format
           (gmm.weights(i), gmm.gaussians(i).mu, gmm.gaussians(i).sigma))
-      }
-      //Thread.sleep(5000)
-
+      }*/
+      //对新用户特征向量进行簇分类
       afterClusterRDD = userVectors.map(r => {
         (gmm.predict(r._2), r)
       })

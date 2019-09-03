@@ -205,7 +205,7 @@ class RandomForestClusterRecommender(ap: RandomForestClusterParams) extends Reco
       val negativeSet = trainingItemSet.diff(userHadSet).diff(userTestSet)
 
       //保证负样本的数量，和正样本数量一致
-      val nSet = Random.shuffle(negativeSet).take(userHadSet.size)
+      val nSet = Random.shuffle(negativeSet).take(4*userHadSet.size)
 
       val userV = newUserVector(r._1)
 
@@ -370,8 +370,20 @@ class RandomForestClusterRecommender(ap: RandomForestClusterParams) extends Reco
     }).
       //聚合同一item的权重
       groupBy(_._1).
+      map(r => {
+
+      val itemid = r._1
+      val scores = r._2.map(_._2).sum
+      (itemid, scores)
+    })
+
+   /*
+    .*/
+
+    val candidate=result.toSeq.sortBy(_._2).reverse.take(400)
+
+    val filterCandidate= candidate.filter(r => {
       //筛选
-      filter(r => {
       //新增随机森林筛选
       val userV = newUserVector(query.user)
       val itemV = newItemVector(r._1)
@@ -388,12 +400,10 @@ class RandomForestClusterRecommender(ap: RandomForestClusterParams) extends Reco
 
       val features: Vector = Vectors.dense(arr)
       randomForestModel.predict(features) == 1.0
-    }).map(r => {
-
-      val itemid = r._1
-      val scores = r._2.map(_._2).sum
-      (itemid, scores)
     })
+    logger.info(s"filterCandidate.size:${filterCandidate.size}")
+
+
     logger.info(s"生成的推荐列表的长度:${result.size}")
     val sum: Double = result.values.sum
     if (sum == 0) return PredictedResult(Array.empty)

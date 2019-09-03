@@ -11,7 +11,8 @@ object App {
 
   def main(args: Array[String]): Unit = {
 
-    runSARCluster()
+    //runKerasCluster()
+    //runSARCluster()
     //runBase()
     //runCluster()
     //runRandomClusterForest()
@@ -20,6 +21,18 @@ object App {
     //runSAR()
     //runHot()
 
+  }
+
+  def runKerasCluster():Unit={
+    val args = List(
+      //最优参数：K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
+      KerasClusterParams(maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240)
+    )
+    for (elem <- args) {
+      val recommender = new KerasClusterRecommender(elem)
+      val eval = new Evaluation()
+      eval.run(recommender)
+    }
   }
 
   def runSARCluster():Unit={
@@ -462,10 +475,18 @@ object App {
       //准确率:0.1825,召回率:0.0997,f1:0.1077,时间:84(ms)
       //ClusterParams(clusterMethod = "BisectingKMeans", k = 4, maxIterations = 10,numNearestUsers=240,numUserLikeMovies=200),
       //准确率:0.1829,召回率:0.1001,f1:0.1081,时间:86(ms)
-      ClusterParams(clusterMethod = "BisectingKMeans", k = 4, maxIterations = 10,numNearestUsers=240,numUserLikeMovies=240)//,
+      //ClusterParams(clusterMethod = "BisectingKMeans", k = 4, maxIterations = 10,numNearestUsers=240,numUserLikeMovies=240)//,
       //准确率:0.1833,召回率:0.1002,f1:0.1084,时间:94(ms)
       //ClusterParams(clusterMethod = "BisectingKMeans", k = 4, maxIterations = 10,numNearestUsers=240,numUserLikeMovies=280)
       /**准确率:0.2175,召回率:0.1301,f1:0.1327,时间:459(ms) */
+
+      //测试方法
+      //ClusterParams(clusterMethod = "BisectingKMeans",method="cosine", k = 4, maxIterations = 10,numNearestUsers=240,numUserLikeMovies=240),
+      /**准确率:0.2176,召回率:0.1304,f1:0.1327,时间:86(ms) */
+      //ClusterParams(clusterMethod = "BisectingKMeans",method="ImprovedPearson", k = 4, maxIterations = 10,numNearestUsers=240,numUserLikeMovies=240),
+      /**准确率:0.1898,召回率:0.1275,f1:0.1249,时间:72(ms) */
+        //ClusterParams(clusterMethod = "BisectingKMeans",method="pearson", k = 4, maxIterations = 10,numNearestUsers=240,numUserLikeMovies=240)//,
+      /**准确率:0.2169,召回率:0.1305,f1:0.1327,时间:73(ms) */
 
       /** 最优参数：K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
        * 最好结果：准确率:0.2175,召回率:0.1301,f1:0.1327,时间:459(ms)*/
@@ -506,6 +527,17 @@ object App {
       //K-means最优参数：k = 4, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240
       //准确率:0.1849,召回率:0.1014,f1:0.1092,时间:112(ms)
 
+
+      //Cosine,ImprovedPearson,Pearson
+      //ClusterParams(clusterMethod = "K-means",method="Cosine", k = 7, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
+      /**准确率:0.2151,召回率:0.1301,f1:0.1324,时间:75(ms) */
+      //ClusterParams(clusterMethod = "K-means",method="ImprovedPearson", k = 7, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
+      /**准确率:0.1889,召回率:0.1274,f1:0.1246,时间:61(ms) */
+
+      //ClusterParams(clusterMethod = "K-means",method="Pearson", k = 7, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240)
+      /**准确率:0.2146,召回率:0.1296,f1:0.1321,时间:57(ms) */
+
+
       /** *------------------GaussianMixture------------------ ***/
       //GaussianMixture
       //k:2
@@ -536,6 +568,13 @@ object App {
       //GaussianMixture:簇心数量:2,maxIterations:10,相似度方法:Cosine,numNearestUsers:240,numUserLikeMovies:240
       //准确率:0.1862,召回率:0.0973,f1:0.1071,时间:220(ms)
 
+      //ImprovedPearson
+      //ClusterParams(clusterMethod = "GaussianMixture",method="Cosine", k = 2, maxIterations = 50, numNearestUsers = 240, numUserLikeMovies = 240),
+      /**准确率:0.2140,召回率:0.1224,f1:0.1275,时间:156(ms) */
+      //ClusterParams(clusterMethod = "GaussianMixture", method="ImprovedPearson",k = 2, maxIterations = 50, numNearestUsers = 240, numUserLikeMovies = 240),
+      /**准确率:0.1906,召回率:0.1278,f1:0.1253,时间:91(ms) */
+      //ClusterParams(clusterMethod = "GaussianMixture",method="Pearson", k = 2, maxIterations = 50, numNearestUsers = 240, numUserLikeMovies = 240)
+      /**准确率:0.2143,召回率:0.1242,f1:0.1285,时间:89(ms) */
 
     )
     for (arg <- args) {
