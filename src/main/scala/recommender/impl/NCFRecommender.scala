@@ -13,6 +13,7 @@ import org.deeplearning4j.nn.graph.ComputationGraph
 import org.nd4j.linalg.activations.Activation
 import org.nd4j.linalg.api.ndarray.INDArray
 import org.nd4j.linalg.factory.Nd4j
+import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction
 import org.slf4j.{Logger, LoggerFactory}
 import recommender._
 
@@ -68,6 +69,16 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
   override def train(data: TrainingData): Unit = {
     require(data.ratings.nonEmpty, "训练数据不能为空！")
 
+    initData(data)
+
+
+    initNCF(data)
+
+
+  }
+
+
+  private def initData(data: TrainingData) = {
     //1.获取训练集中每个用户的观看列表
     userHasItem = data.ratings.groupBy(_.user)
 
@@ -125,8 +136,9 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
 
     newUserVector = userVectors.toMap
     newItemVector = itemVectors.toMap
+  }
 
-
+  private def initNCF(data: TrainingData) = {
     /** -------------------神经网络--------------------- **/
     val userVS = newUserVector.head._2.size
     val itemVS = newItemVector.head._2.size
@@ -151,8 +163,12 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
       .addLayer("MLP4", new DenseLayer.Builder().nIn(unionSize).nOut(4 * unionSize).build(), "input")
       .addLayer("MLP2", new DenseLayer.Builder().nIn(4 * unionSize).nOut(2 * unionSize).build(), "MLP4")
       .addLayer("MLP1", new DenseLayer.Builder().activation(Activation.SIGMOID).nIn(2 * unionSize).nOut(unionSize).build(), "MLP2")
+
       .addVertex("ncf", new MergeVertex(), "GML", "MLP1")
-      .addLayer("out", new OutputLayer.Builder().nIn(unionSize + unionSize).activation(Activation.SOFTMAX).nOut(2).build(), "ncf")
+
+      .addLayer("out", new OutputLayer.Builder(LossFunction.XENT)
+        .nIn(unionSize + unionSize).activation(Activation.SIGMOID)
+        .nOut(1).build(), "ncf")
       .setOutputs("out")
       .build()
 
@@ -165,78 +181,41 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
 
     //2.正样本数据
     logger.info("正样本数据")
-    val positiveData: Seq[(Int, INDArray, INDArray, INDArray)] = data.ratings.map(r => {
+    val positiveData = data.ratings.map(r => {
       //构建特征数据
-      val userV: linalg.Vector = newUserVector(r.user)
-      val itemV: linalg.Vector = newItemVector(r.item)
+      val userV = newUserVector(r.user)
+      val itemV = newItemVector(r.item)
 
-      val userArray = new Array[Float](userV.size)
-      for (idx <- 0 until userV.size) {
-        userArray(idx) = userV(idx).toFloat
-      }
-      val itemArray = new Array[Float](itemV.size)
-      for (idx <- 0 until itemV.size) {
-        itemArray(idx) = itemV(idx).toFloat
-      }
-
-      //生成标签
-      val la = new Array[Float](2)
-      la(0) = 0
-      la(1) = 1
-
-      (Random.nextInt(size),
-        Nd4j.create(userArray).reshape(1, userArray.length),
-        Nd4j.create(itemArray).reshape(1, itemArray.length),
-        Nd4j.create(la).reshape(1, 2))
+      (Random.nextInt(size),userV,itemV,1F)
     })
 
     //3.负样本数据
     logger.info("负样本数据")
 
     val trainingItemSet = data.ratings.map(_.item).distinct.toSet
-    val negativeData: Seq[(Int, INDArray, INDArray, INDArray)] = userHasItem.flatMap(r => {
+    val negativeData = userHasItem.flatMap(r => {
       //当前用户拥有的物品
       val userHadSet = r._2.map(_.item).distinct.toSet
-
       //未分割前的所有物品
       val userHadAllSet = allUserHadItemsMap(r._1)
+
       //用户测试集中的物品
       val userTestSet = userHadAllSet.diff(userHadSet)
-
       val negativeSet = trainingItemSet.diff(userHadSet).diff(userTestSet)
 
       //保证负样本的数量，和正样本数量一致
       val nSet = Random.shuffle(negativeSet).take(userHadSet.size)
 
       val userV = newUserVector(r._1)
-
       nSet.map(itemID => {
         val itemV = newItemVector(itemID)
-
-        val userArray = new Array[Float](userV.size)
-        for (idx <- 0 until userV.size) {
-          userArray(idx) = userV(idx).toFloat
-        }
-        val itemArray = new Array[Float](itemV.size)
-        for (idx <- 0 until itemV.size) {
-          itemArray(idx) = itemV(idx).toFloat
-        }
-
-        //生成标签
-        val la = new Array[Float](2)
-        la(0) = 1
-        la(1) = 0
-
-        (Random.nextInt(size),
-          Nd4j.create(userArray).reshape(1, userArray.length),
-          Nd4j.create(itemArray).reshape(1, itemArray.length),
-          Nd4j.create(la).reshape(1, 2))
+        (Random.nextInt(size),userV,itemV,0F)
       })
     }).toSeq
 
     //4.数据打散
     logger.info("数据打散")
-    val trainTempData = new Array[(Int, INDArray, INDArray, INDArray)](positiveData.size + negativeData.size)
+    val trainTempData = new Array[(Int, linalg.Vector, linalg.Vector, Float)](positiveData.size + negativeData.size)
     var idx = 0
     positiveData.foreach(r => {
       trainTempData(idx) = r
@@ -254,20 +233,24 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
 
     //训练模型
     logger.info("开始训练模型...")
-    var logIdx = 0
-    finalData.foreach(r => {
-      if (logIdx % 100 == 0) {
-        logger.info(s"index:$logIdx")
-      }
+    val userInEmbedding: INDArray = Nd4j.create(finalData.length, userVS)
+    val itemInEmbedding: INDArray = Nd4j.create(finalData.length, itemVS)
+    val outLabels: INDArray = Nd4j.create(finalData.length, 1)
 
-      ncfModel.fit(Array(r._1, r._2), Array(r._3))
-      logIdx += 1
-    })
+    finalData.zipWithIndex.foreach({ case ((userIDVector,itemIDVector,label), index) => {
+      userInEmbedding.putRow(index,Nd4j.create(userIDVector.toArray))
+      itemInEmbedding.putRow(index,Nd4j.create(itemIDVector.toArray))
+
+      outLabels.putScalar(Array[Int](index,0),label)
+    }})
+
+    ncfModel.setInputs(userInEmbedding,itemInEmbedding)
+    ncfModel.setLabels(outLabels)
+
+    ncfModel.fit()
+
     logger.info("训练模型完成")
-
-
   }
-
 
   private var ncfModel: ComputationGraph = _
 
@@ -278,8 +261,9 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
     val currentUserSawSet = userHasItem(query.user).map(_.item)
     logger.info(s"已经观看的列表长度为:${currentUserSawSet.size}")
 
-    var logN = 0
+
     //筛选相近用户
+    logger.info("除了看过的电影，其它电影都作为候选集进行遍历。")
     val candidateItems = allTrainingItemSet.filter(r => {
       currentUserSawSet.nonEmpty && !currentUserSawSet.contains(r)
     })
@@ -294,25 +278,13 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
           //新增NCF筛选
           val userV = newUserVector(query.user)
           val itemV = newItemVector(item)
-          //生成特征向量
-          val userArray = new Array[Float](userV.size)
-          for (idx <- 0 until userV.size) {
-            userArray(idx) = userV(idx).toFloat
-          }
-          val itemArray = new Array[Float](itemV.size)
-          for (idx <- 0 until itemV.size) {
-            itemArray(idx) = itemV(idx).toFloat
-          }
 
+          val vU = Nd4j.create(1,userV.size).putRow(0,Nd4j.create(userV.toArray))
+          val vI = Nd4j.create(1,itemV.size).putRow(0,Nd4j.create(itemV.toArray))
 
-          val vU = Nd4j.create(userArray).reshape(1, userArray.length)
-          val vI = Nd4j.create(itemArray).reshape(1, itemArray.length)
-
-          //val start = System.currentTimeMillis()
           val vs: Array[INDArray] = ncfModel.output(vU, vI)
-          //logger.info("计算所需时间：" + (System.currentTimeMillis() - start))
 
-          (item, vs(0).getFloat(1))
+          (item, vs(0).getFloat(0L))
         }
       })
       pool.submit(future)
@@ -326,40 +298,10 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
 
     /** ------end------ **/
 
-    /* val result = candidateItems.map(item => {
-       //新增NCF筛选
-       val userV = newUserVector(query.user)
-       val itemV = newItemVector(item)
-       //生成特征向量
-       val userArray = new Array[Float](userV.size)
-       for (idx <- 0 until userV.size) {
-         userArray(idx) = userV(idx).toFloat
-       }
-       val itemArray = new Array[Float](itemV.size)
-       for (idx <- 0 until itemV.size) {
-         itemArray(idx) = itemV(idx).toFloat
-       }
-
-
-       val vU = Nd4j.create(userArray).reshape(1, userArray.length)
-       val vI = Nd4j.create(itemArray).reshape(1, itemArray.length)
-
-       //val start = System.currentTimeMillis()
-       val vs: Array[INDArray] = ncfModel.output(vU, vI)
-       //logger.info("计算所需时间：" + (System.currentTimeMillis() - start))
-
-       val sc = vs(0).getFloat(1)
-       if (logN < 2) {
-         logger.info(s"itemID:$item,sc:$sc")
-         logN += 1
-       }
-
-       (item, sc)
-     })*/
-
-
     val returnResult = result.map(r => {
-      ItemScore(r._1, r._2)
+      val itemS= ItemScore(r._1, r._2)
+      logger.info(itemS.toString)
+      itemS
     }).toArray.sortBy(_.score).reverse.take(query.num)
 
     //排序，返回结果

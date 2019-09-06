@@ -16,8 +16,8 @@ object App {
     //runBase()
     //runCluster()
     //runRandomClusterForest()
-    runNCFCluster()
-    //runNCF()
+    //runNCFCluster()
+    runNCF()
     //runSAR()
     //runHot()
 
