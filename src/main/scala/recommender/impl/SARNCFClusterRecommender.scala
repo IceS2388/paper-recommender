@@ -5,19 +5,36 @@ import org.apache.spark.mllib.clustering.{BisectingKMeans, GaussianMixture, KMea
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.sql.SparkSession
+import org.deeplearning4j.nn.api.OptimizationAlgorithm
+import org.deeplearning4j.nn.conf.NeuralNetConfiguration
+import org.deeplearning4j.nn.conf.graph.MergeVertex
+import org.deeplearning4j.nn.conf.layers.misc.ElementWiseMultiplicationLayer
+import org.deeplearning4j.nn.conf.layers.{DenseLayer, OutputLayer}
+import org.deeplearning4j.nn.graph.ComputationGraph
+import org.nd4j.linalg.activations.Activation
+import org.nd4j.linalg.api.ndarray.INDArray
+import org.nd4j.linalg.factory.Nd4j
+import org.nd4j.linalg.lossfunctions.LossFunctions.LossFunction
 import org.slf4j.{Logger, LoggerFactory}
 import recommender._
 import recommender.tools.{BiMap, Correlation, NearestUserAccumulator}
 
 import scala.collection.mutable
+import scala.util.Random
 
-case class SARClusterParams(
-                             clusterMethod: String = "BisectingKMeans",
-                             k: Int = 2,
-                             maxIterations: Int = 20,
-                             method: String = "Cosine",
-                             numNearestUsers: Int = 5,
-                             numUserLikeMovies: Int = 5) extends Params {
+/**
+  * Author:IceS
+  * Date:2019-09-03 12:08:26
+  * Description:
+  * NONE
+  */
+case class SARNCFClusterParams(
+                                clusterMethod: String = "BisectingKMeans",
+                                k: Int = 2,
+                                maxIterations: Int = 20,
+                                method: String = "Cosine",
+                                numNearestUsers: Int = 5,
+                                numUserLikeMovies: Int = 5) extends Params {
   override def getName(): String = {
     this.getClass.getSimpleName.replace("Params", "") + s"_$clusterMethod"
   }
@@ -25,22 +42,25 @@ case class SARClusterParams(
   override def toString: String = s"聚类{聚类方法：$clusterMethod,簇心数量:$k,maxIterations:$maxIterations,相似度方法:$method,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}\r\n"
 }
 
-/**
-  * Author:IceS
-  * Date:2019-08-27 15:22:20
-  * Description:
-  * NONE
-  */
-class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
+class SARNCFClusterRecommender(ap: SARNCFClusterParams) extends Recommender {
   @transient private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   override def getParams: Params = ap
 
 
+  //每个用户所有的物品
+  private var userAllItemSet: Map[Int, Set[Int]] = _
+
   override def prepare(data: Seq[Rating]): PrepairedData = {
 
     require(data.nonEmpty, "原始数据不能为空！")
 
+    userAllItemSet = data.groupBy(_.user).map(r => {
+      val userId = r._1
+      //
+      val itemSet = r._2.map(_.item).toSet
+      (userId, itemSet)
+    })
 
     new PrepairedData(data)
   }
@@ -49,9 +69,10 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
   private var afterClusterRDD: Seq[(Int, (Int, linalg.Vector))] = _
   // 训练集中用户所拥有item
   private var userGroup: Map[Int, Seq[Rating]] = _
+  // 根据物品分组，用于创建物品特征
+  private var itemsGroup: Map[Int, Set[Int]] = _
 
-
-
+  private var newItemVector: collection.Map[Int, linalg.Vector] = _
   private var newUserVector: collection.Map[Int, linalg.Vector] = _
 
   override def train(data: TrainingData): Unit = {
@@ -61,7 +82,7 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
 
     // 把数据按照用户进行分组
     userGroup = data.ratings.groupBy(_.user)
-    // 把数据按照物品分组,SAR中计算电影之间的相似度时使用
+    // 把数据按照物品分组
     itemsGroup = data.ratings.groupBy(_.item).map(r => (r._1, r._2.map(_.user).toSet))
     // 初始化新的特征向量
     initVectors(data)
@@ -76,6 +97,8 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
     logger.info("计算用户邻近的相似用户中....")
     nearestUser = userNearestNeighbours()
 
+    // 初始化神经网络
+    initalNCF(data)
 
   }
 
@@ -105,15 +128,159 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
       (uid, Vectors.dense(c1, c2, c3, c4, c5))
     }).toSeq
 
+    val itemVectors = data.ratings.groupBy(_.item).map(r => {
+      val iid = r._1
+
+      var c1 = 0D //1.0
+      var c2 = 0D //2.0
+      var c3 = 0D //3.0
+      var c4 = 0D //4.0
+      var c5 = 0D //5.0
+
+      r._2.foreach(r2 => {
+        if (r2.rating == 1.0)
+          c1 += 1
+        else if (r2.rating == 2.0)
+          c2 += 1
+        else if (r2.rating == 3.0)
+          c3 += 1
+        else if (r2.rating == 4.0)
+          c4 += 1
+        else
+          c5 += 1
+      })
+      (iid, Vectors.dense(c1, c2, c3, c4, c5))
+    }).toSeq
+
     newUserVector = userVectors.toMap
+    newItemVector = itemVectors.toMap
+
+  }
+
+  private def initalNCF(data: TrainingData): Unit = {
+    /** -------------------神经网络--------------------- **/
+    val userVS = newUserVector.head._2.size
+    val itemVS = newItemVector.head._2.size
+    val unionSize = userVS + itemVS
 
 
+    //1.配置网络结构
+    val computationGraphConf = new NeuralNetConfiguration.Builder()
+      .seed(123)
+      .activation(Activation.RELU)
+      .optimizationAlgo(OptimizationAlgorithm.STOCHASTIC_GRADIENT_DESCENT)
+      .updater(new org.nd4j.linalg.learning.config.AdaDelta())
+      .l2(1e-3)
+      .graphBuilder()
+      .addInputs("user_input", "item_input")
+
+      .addLayer("userLayer", new DenseLayer.Builder().nIn(userVS).nOut(userVS).activation(Activation.IDENTITY).build(), "user_input")
+      .addLayer("itemLayer", new DenseLayer.Builder().nIn(itemVS).nOut(itemVS).activation(Activation.IDENTITY).build(), "item_input")
+
+      .addLayer("GML", new ElementWiseMultiplicationLayer.Builder().nIn(unionSize).nOut(unionSize).build(), "userLayer", "itemLayer")
+
+      .addVertex("input", new MergeVertex(), "userLayer", "itemLayer")
+
+      .addLayer("MLP4", new DenseLayer.Builder().nIn(unionSize).nOut(4 * unionSize).build(), "input")
+      .addLayer("MLP2", new DenseLayer.Builder().nIn(4 * unionSize).nOut(2 * unionSize).build(), "MLP4")
+      .addLayer("MLP1", new DenseLayer.Builder().activation(Activation.SIGMOID).nIn(2 * unionSize).nOut(unionSize).build(), "MLP2")
+      .addVertex("ncf", new MergeVertex(), "GML", "MLP1")
+      .addLayer("out", new OutputLayer.Builder(LossFunction.XENT).nIn(unionSize + unionSize).activation(Activation.SIGMOID).nOut(1).build(), "ncf")
+      .setOutputs("out")
+      .build()
+
+
+    ncfModel = new ComputationGraph(computationGraphConf)
+    ncfModel.init()
+
+
+    val size = data.ratings.size
+
+    //2.正样本数据
+    logger.info("正样本数据")
+    val positiveData: Seq[(Int, INDArray, INDArray, INDArray)] = data.ratings.map(r => {
+      //构建特征数据
+      val userV: linalg.Vector = newUserVector(r.user)
+      val itemV: linalg.Vector = newItemVector(r.item)
+
+      //生成标签
+      val la = new Array[Double](1)
+      la(0) = 1
+
+
+      (Random.nextInt(size),
+        Nd4j.create(userV.toArray).reshape(1, userV.size),
+        Nd4j.create(itemV.toArray).reshape(1, itemV.size),
+        Nd4j.create(la).reshape(1, 1))
+    })
+
+    //3.负样本数据
+    logger.info("负样本数据")
+    val trainingItemSet = data.ratings.map(_.item).distinct.toSet
+    val negativeData: Seq[(Int, INDArray, INDArray, INDArray)] = userGroup.flatMap(r => {
+      //当前用户拥有的物品
+      val userHadSet = r._2.map(_.item).distinct.toSet
+      //未分割前的所有物品
+      val userHadAllSet = userAllItemSet(r._1)
+      //用户测试集中的物品
+      val userTestSet = userHadAllSet.diff(userHadSet)
+
+      val negativeSet = trainingItemSet.diff(userHadSet).diff(userTestSet)
+      //保证负样本的数量，和正样本数量一致 4=kFold-1
+      val nSet = Random.shuffle(negativeSet).take(userHadSet.size)
+
+      val userV = newUserVector(r._1)
+
+      nSet.map(itemID => {
+        val itemV = newItemVector(itemID)
+
+        //生成标签
+        val la = new Array[Double](1)
+        la(0) = 0
+
+        (Random.nextInt(size),
+          Nd4j.create(userV.toArray).reshape(1, userV.size),
+          Nd4j.create(itemV.toArray).reshape(1, itemV.size),
+          Nd4j.create(la).reshape(1, 1))
+      })
+    }).toSeq
+
+    //4.数据打散
+    logger.info("数据打散")
+    val trainTempData = new Array[(Int, INDArray, INDArray, INDArray)](positiveData.size + negativeData.size)
+    var idx = 0
+    positiveData.foreach(r => {
+      trainTempData(idx) = r
+      idx += 1
+    })
+
+    negativeData.foreach(r => {
+      trainTempData(idx) = r
+      idx += 1
+    })
+
+    val finalData = trainTempData.sortBy(_._1).map(r => {
+      (r._2, r._3, r._4)
+    })
+
+    //训练模型
+    logger.info("开始训练模型...")
+    var logIdx = 0
+    finalData.foreach(r => {
+      if (logIdx % 1000 == 0) {
+        logger.info(s"index:$logIdx")
+      }
+
+      ncfModel.fit(Array(r._1, r._2), Array(r._3))
+      logIdx += 1
+    })
+    logger.info("训练模型完成")
   }
 
   /**
     * 对用户向量进行聚类。
     **/
-  private def clusterUsers(userVectors: Seq[(Int, linalg.Vector)]): Unit = {
+  private def clusterUsers(userVectors: Seq[(Int, linalg.Vector)]) = {
     logger.info("正在对用户评分向量进行聚类，需要些时间...")
     //3.准备聚类
     val sparkSession = SparkSession.builder().master("local[*]").appName(this.getClass.getSimpleName).getOrCreate()
@@ -213,8 +380,8 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
   private var userLikedMap: Map[Int, Seq[Rating]] = _
   // 与用户相似度最高的前n个用户
   private var nearestUser: mutable.Map[String, Double] = _
-  // 根据物品分组，用于创建物品特征
-  private var itemsGroup: Map[Int, Set[Int]] = _
+  // NCF模型
+  private var ncfModel: ComputationGraph = _
 
   override def predict(query: Query): PredictedResult = {
     //1. 查看用户是否有相似度用户
@@ -263,24 +430,39 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
         val itemID = r._1
         val scores = r._2.map(_._2).sum
         (itemID, scores)
-      }).toArray.sortBy(_._2).reverse.take(400).map(_._1).toSet
+      }).toArray.sortBy(_._2).reverse.take(400)
 
+    //实现神经网络筛选
+    val candidateMoviesSet = candidateMovies.filter(r => {
 
+      val userV = newUserVector(query.user)
+      val itemV = newItemVector(r._1)
+
+      //生成特征向量
+      val vU = Nd4j.create(userV.toArray).reshape(1, userV.size)
+      val vI = Nd4j.create(itemV.toArray).reshape(1, itemV.size)
+
+      val vs: Array[INDArray] = ncfModel.output(vU, vI)
+
+      val sc: Double = vs(0).getDouble(0L)
+
+      sc > 0.6
+    }).map(_._1).toSet
 
     //对应候选列表的索引
-    val candidateItems2Index = BiMap.toIndex(candidateMovies)
+    val candidateItems2Index = BiMap.toIndex(candidateMoviesSet)
     val sawItems2Index = BiMap.toIndex(currentUserSawSet)
 
     //1.生成用户关联矩阵
     val affinityMatrix = DenseMatrix.ones[Float](1, currentUserSawSet.size)
 
     //2.生成item2item的相似度矩阵
-    val itemToItemMatrix: DenseMatrix[Float] = DenseMatrix.zeros[Float](currentUserSawSet.size, candidateMovies.size)
+    val itemToItemMatrix: DenseMatrix[Float] = DenseMatrix.zeros[Float](currentUserSawSet.size, candidateMoviesSet.size)
 
     //赋予矩阵相似度值,这个过程比较费时间
     for {
       sawID <- currentUserSawSet
-      cID <- candidateMovies
+      cID <- candidateMoviesSet
     } {
       //计算相关系数值
       val s = Correlation.getJaccardSAR(1, sawID, cID, itemsGroup).toFloat

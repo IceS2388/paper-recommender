@@ -16,7 +16,7 @@ object App {
     //runBase()
     //runCluster()
     //runRandomClusterForest()
-    //runNCFCluster()
+    runNCFCluster()
     //runNCF()
     //runSAR()
     //runHot()
@@ -30,6 +30,17 @@ object App {
     )
     for (elem <- args) {
       val recommender = new KerasClusterRecommender(elem)
+      val eval = new Evaluation()
+      eval.run(recommender)
+    }
+  }
+  def runSARNCFCluster():Unit={
+    val args = List(
+      //最优参数：K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
+      SARNCFClusterParams(k=4,maxIterations = 10,numNearestUsers = 240,numUserLikeMovies = 240)
+    )
+    for (elem <- args) {
+      val recommender = new SARNCFClusterRecommender(elem)
       val eval = new Evaluation()
       eval.run(recommender)
     }

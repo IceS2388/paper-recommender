@@ -192,11 +192,15 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
       .addLayer("userLayer", new DenseLayer.Builder().nIn(userVS).nOut(userVS).activation(Activation.IDENTITY).build(), "user_input")
       .addLayer("itemLayer", new DenseLayer.Builder().nIn(itemVS).nOut(itemVS).activation(Activation.IDENTITY).build(), "item_input")
 
-      .addLayer("GML", new ElementWiseMultiplicationLayer.Builder().nIn(unionSize).nOut(unionSize).build(), "userLayer", "itemLayer")
+      .addLayer("GML", new ElementWiseMultiplicationLayer.Builder()
+        .nIn(unionSize)
+        .nOut(unionSize)
+        .activation(Activation.IDENTITY)
+        .build(), "userLayer", "itemLayer")
 
-      .addVertex("input", new MergeVertex(), "userLayer", "itemLayer")
+      .addVertex("merge", new MergeVertex(), "userLayer", "itemLayer")
 
-      .addLayer("MLP4", new DenseLayer.Builder().nIn(unionSize).nOut(4 * unionSize).build(), "input")
+      .addLayer("MLP4", new DenseLayer.Builder().nIn(unionSize).nOut(4 * unionSize).build(), "merge")
       .addLayer("MLP2", new DenseLayer.Builder().nIn(4 * unionSize).nOut(2 * unionSize).build(), "MLP4")
       .addLayer("MLP1", new DenseLayer.Builder().activation(Activation.SIGMOID).nIn(2 * unionSize).nOut(unionSize).build(), "MLP2")
       .addVertex("ncf", new MergeVertex(), "GML", "MLP1")
@@ -416,7 +420,8 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
 
       val sc: Double = vs(0).getDouble(0L)
 
-      sc>0.6
+      sc>0.8
+
     })
 
     logger.info(s"生成的推荐列表的长度:${result.size}")
