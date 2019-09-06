@@ -1,7 +1,5 @@
 package recommender.impl
 
-import java.util.concurrent.{Callable, Executors, FutureTask}
-
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.Vectors
 import org.deeplearning4j.nn.api.OptimizationAlgorithm
@@ -270,37 +268,26 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
 
     logger.info(s"候选列表长度为：${candidateItems.size}")
 
-    val pool = Executors.newFixedThreadPool(4)
+    val userV = newUserVector(query.user)
+    val userInputs=Nd4j.create(candidateItems.size,userV.size)
+    val itemSize=newItemVector(1).size
+    val itemInputs=Nd4j.create(candidateItems.size,itemSize)
 
-    val futures = candidateItems.map(item => {
-      val future = new FutureTask[(Int, Float)](new Callable[(Int, Float)]() {
-        override def call(): (Int, Float) = {
-          //新增NCF筛选
-          val userV = newUserVector(query.user)
-          val itemV = newItemVector(item)
+    val indexToItem = candidateItems.zipWithIndex.map({case(itemID,index)=>{
+      userInputs.putRow(index,Nd4j.create(userV.toArray))
+      itemInputs.putRow(index,Nd4j.create(newItemVector(itemID).toArray))
+      (index,itemID)
+    }}).toMap
 
-          val vU = Nd4j.create(1,userV.size).putRow(0,Nd4j.create(userV.toArray))
-          val vI = Nd4j.create(1,itemV.size).putRow(0,Nd4j.create(itemV.toArray))
-
-          val vs: Array[INDArray] = ncfModel.output(vU, vI)
-
-          (item, vs(0).getFloat(0L))
-        }
-      })
-      pool.submit(future)
-      future
+    val vs: Array[INDArray] = ncfModel.output(userInputs, itemInputs)
+    val result=vs.indices.map(idx=>{
+      (indexToItem(idx),vs(idx).getFloat(0L))
     })
-    pool.shutdown()
-    val result = futures.map(f => {
-      f.get()
-    })
-
 
     /** ------end------ **/
 
     val returnResult = result.map(r => {
       val itemS= ItemScore(r._1, r._2)
-      logger.info(itemS.toString)
       itemS
     }).toArray.sortBy(_.score).reverse.take(query.num)
 
