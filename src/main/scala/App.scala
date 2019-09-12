@@ -16,8 +16,8 @@ object App {
     //runBase()
     //runCluster()
     //runRandomClusterForest()
-    //runNCFCluster()
-    runNCF()
+    runNCFCluster()
+    //runNCF()
     //runSAR()
     //runHot()
 
@@ -598,7 +598,8 @@ object App {
   def runNCFCluster(): Unit = {
 
     val args = List(
-      NCFClusterParams(maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240)//,
+      //NCFClusterParams(maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
+      NCFClusterParams(oneHot=true, maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240)
       //NCFClusterParams(method = "ImprovedPearson", maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240),
       //NCFClusterParams(method = "pearson", maxIterations = 10, numNearestUsers = 240, numUserLikeMovies = 240)
     )

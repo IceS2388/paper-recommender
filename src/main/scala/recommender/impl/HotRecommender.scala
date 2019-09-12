@@ -25,15 +25,15 @@ class HotRecommender(ap: HotParams) extends Recommender {
     new PrepairedData(data)
   }
 
-  private var hotestItems: Array[(Int, Int)] = _
+  private var hotestMovies: Array[(Int, Int)] = _
 
   private var userHasItem: Map[Int, Seq[Rating]] = _
 
   override def train(data: TrainingData): Unit = {
     //1.生成热榜
-    hotestItems = data.ratings.groupBy(_.item).map(r => {
+    hotestMovies = data.ratings.groupBy(_.item).map(r => {
       //r._1//Int item
-      //r._2.size//评论
+      //r._2.size//评论的数量
       (r._1, r._2.size)
     }).toArray.sortBy(_._2).reverse
 
@@ -47,7 +47,7 @@ class HotRecommender(ap: HotParams) extends Recommender {
     val currentUserSawSet = userHasItem(query.user).map(_.item)
     logger.info(s"已经观看的列表长度为:${currentUserSawSet.size}")
     //筛选相近用户
-    val result: Array[(Int, Int)] = hotestItems.
+    val result: Array[(Int, Int)] = hotestMovies.
       //过滤已经看过的
       filter(r => {
       currentUserSawSet.nonEmpty && !currentUserSawSet.contains(r._1)

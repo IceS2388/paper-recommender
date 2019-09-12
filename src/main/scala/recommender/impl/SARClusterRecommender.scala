@@ -140,13 +140,6 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
     } else if (ap.clusterMethod.toLowerCase() == "GaussianMixture".toLowerCase()) {
       val gmm = new GaussianMixture().setK(ap.k).run(dtrain)
 
-      /*//调试信息
-      //查看集合内偏差的误差平方和
-      for (i <- 0 until gmm.k) {
-        println("weight=%f\nmu=%s\nsigma=\n%s\n" format
-          (gmm.weights(i), gmm.gaussians(i).mu, gmm.gaussians(i).sigma))
-      }
-      */
 
       afterClusterRDD = userVectors.map(r => {
         (gmm.predict(r._2), r)

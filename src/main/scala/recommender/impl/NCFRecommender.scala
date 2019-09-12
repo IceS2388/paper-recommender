@@ -76,7 +76,7 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
   }
 
 
-  private def initData(data: TrainingData) = {
+  private def initData(data: TrainingData):Unit = {
     //1.获取训练集中每个用户的观看列表
     userHasItem = data.ratings.groupBy(_.user)
 
@@ -136,7 +136,7 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
     newItemVector = itemVectors.toMap
   }
 
-  private def initNCF(data: TrainingData) = {
+  private def initNCF(data: TrainingData):Unit = {
     /** -------------------神经网络--------------------- **/
     val userVS = newUserVector.head._2.size
     val itemVS = newItemVector.head._2.size
@@ -235,12 +235,12 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
     val itemInEmbedding: INDArray = Nd4j.create(finalData.length, itemVS)
     val outLabels: INDArray = Nd4j.create(finalData.length, 1)
 
-    finalData.zipWithIndex.foreach({ case ((userIDVector,itemIDVector,label), index) => {
+    finalData.zipWithIndex.foreach({ case ((userIDVector,itemIDVector,label), index) =>
       userInEmbedding.putRow(index,Nd4j.create(userIDVector.toArray))
       itemInEmbedding.putRow(index,Nd4j.create(itemIDVector.toArray))
 
       outLabels.putScalar(Array[Int](index,0),label)
-    }})
+    })
 
     ncfModel.setInputs(userInEmbedding,itemInEmbedding)
     ncfModel.setLabels(outLabels)
@@ -273,22 +273,22 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
     val itemSize=newItemVector(1).size
     val itemInputs=Nd4j.create(candidateItems.size,itemSize)
 
-    val indexToItem = candidateItems.zipWithIndex.map({case(itemID,index)=>{
+    val indexToItem = candidateItems.zipWithIndex.map({case(itemID,index)=>
       userInputs.putRow(index,Nd4j.create(userV.toArray))
       itemInputs.putRow(index,Nd4j.create(newItemVector(itemID).toArray))
       (index,itemID)
-    }}).toMap
+    }).toMap
 
     val vs: Array[INDArray] = ncfModel.output(userInputs, itemInputs)
-    val result=vs.indices.map(idx=>{
-      (indexToItem(idx),vs(idx).getFloat(0L))
+    val result=(0 until vs(0).length().toInt ).map(idx=>{
+      val score=vs(0).getFloat(idx)
+      (indexToItem(idx),score)
     })
 
     /** ------end------ **/
 
     val returnResult = result.map(r => {
-      val itemS= ItemScore(r._1, r._2)
-      itemS
+      ItemScore(r._1, r._2)
     }).toArray.sortBy(_.score).reverse.take(query.num)
 
     //排序，返回结果
