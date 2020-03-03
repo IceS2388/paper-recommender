@@ -17,17 +17,18 @@ import scala.collection.mutable
   * 这个类的重点是测试聚类算法
   */
 case class ClusterParams(
-                          clusterMethod: String = "BisectingKMeans",
-                          k: Int = 2,
-                          maxIterations: Int = 20,
-                          method: String = "Cosine",
-                          numNearestUsers: Int = 5,
-                          numUserLikeMovies: Int = 5) extends Params {
+                          CM: String = "BisectingKMeans", //聚类算法名
+                          CC: Int = 2, //类簇数量
+                          MI: Int = 20, //maxIterations最大迭代次数
+                          SM: String = "Cosine", //相似度计算方法
+                          K: Int = 5, //近邻的数目
+                          L: Int = 5//用户喜欢的电影列表长度
+                        ) extends Params {
   override def getName(): String = {
-    this.getClass.getSimpleName.replace("Params", "") + s"_$clusterMethod"
+    this.getClass.getSimpleName.replace("Params", "") + s"_$CM"
   }
 
-  override def toString: String = s"聚类{聚类方法：$clusterMethod,簇心数量:$k,maxIterations:$maxIterations,相似度方法:$method,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}\r\n"
+  override def toString: String = s"聚类{聚类方法：$CM,簇心数量:$CC,最大迭代次数:$MI,相似度方法:$SM,近邻的数目:$K,用户喜欢的电影列表长度:$L}\r\n"
 }
 
 
@@ -39,26 +40,26 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
   //用户的评分向量
   private var afterClusterRDD: Seq[(Int, (Int, linalg.Vector))] = _
   //训练集中用户所拥有item
-  private var userHasItem: Map[Int, Seq[Rating]] = _
+  private var userHadItem: Map[Int, Seq[Rating]] = _
 
 
-  override def prepare(data: Seq[Rating]): PrepairedData = {
+  override def prepare(data: Seq[Rating]): PreparedData = {
 
     require(data.nonEmpty, "原始数据不能为空！")
 
-    new PrepairedData(data)
+    new PreparedData(data)
   }
 
   override def train(data: TrainingData): Unit = {
 
     require(data.ratings.nonEmpty, "训练数据不能为空！")
-    require(Set("BisectingKMeans", "K-means", "GaussianMixture").contains(ap.clusterMethod), "聚类方法必须在是：[BisectingKMeans,K-means,GaussianMixture]其中之一!")
+    require(Set("BisectingKMeans", "K-means", "GaussianMixture").contains(ap.CM), "聚类方法必须在是：[BisectingKMeans,K-means,GaussianMixture]其中之一!")
 
     //1.获取训练集中每个用户的观看列表
-    userHasItem = data.ratings.groupBy(_.user)
+    userHadItem = data.ratings.groupBy(_.user)
 
-    //实现新的统计方法
-    val userVectors = userHasItem.map(r => {
+    //2.根据用户评分中，各个评分等级的数量进行构造
+    val userVectors = userHadItem.map(r => {
       val uid = r._1
       var c1 = 0D //1.0
       var c2 = 0D //2.0
@@ -87,15 +88,15 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
     logger.info("正在对用户评分向量进行聚类，需要些时间...")
     //3.准备聚类
     val sparkSession = SparkSession.builder().master("local[*]").appName(this.getClass.getSimpleName).getOrCreate()
-
-    val d = sparkSession.sparkContext.parallelize(userVectors)
-    val dtrain = d.map(_._2)
+    //并行读入数据
+    val pData = sparkSession.sparkContext.parallelize(userVectors)
+    val dTrain = pData.map(_._2)
 
     //选择聚类算法
-    if (ap.clusterMethod.toLowerCase() == "BisectingKMeans".toLowerCase) {
+    if (ap.CM.toLowerCase() == "BisectingKMeans".toLowerCase) {
       //二分k-means
-      val bkm = new BisectingKMeans().setK(ap.k).setMaxIterations(ap.maxIterations)
-      val model = bkm.run(dtrain)
+      val bkm = new BisectingKMeans().setK(ap.CC).setMaxIterations(ap.MI)
+      val model = bkm.run(dTrain)
 
       /*//调试信息
       //查看集合内偏差的误差平方和
@@ -107,9 +108,9 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
       afterClusterRDD = userVectors.map(r => {
         (model.predict(r._2), r)
       })
-    } else if (ap.clusterMethod.toLowerCase() == "K-means".toLowerCase) {
+    } else if (ap.CM.toLowerCase() == "K-means".toLowerCase) {
       //k-means II
-      val clusters = KMeans.train(dtrain, ap.k, ap.maxIterations)
+      val clusters = KMeans.train(dTrain, ap.CC, ap.MI)
 
       /*//调试信息
       //查看集合内偏差的误差平方和
@@ -121,9 +122,9 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
       afterClusterRDD = userVectors.map(r => {
         (clusters.predict(r._2), r)
       })
-    } else if (ap.clusterMethod.toLowerCase() == "GaussianMixture".toLowerCase()) {
+    } else if (ap.CM.toLowerCase() == "GaussianMixture".toLowerCase()) {
       //高斯
-      val gmm = new GaussianMixture().setK(ap.k).run(dtrain)
+      val gmm = new GaussianMixture().setK(ap.CC).run(dTrain)
 
      /* //调试信息
       //查看集合内偏差的误差平方和
@@ -138,52 +139,43 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
     }
 
 
-
-    //4.聚类用户评分向量(族ID,评分向量),根据聚类计算用户之间的相似度使用
-
-
     /** -------------------生成共享数据--------------------- **/
 
     sparkSession.close()
 
-    //2.生成用户喜欢的电影
+    //4.生成用户喜欢的电影
     userLikedMap = userLikedItems()
     //调试信息
     logger.info("训练集中的用户总数:" + userLikedMap.size)
 
-    //3.根据用户评分向量生成用户最邻近用户的列表
+    //5.根据用户评分向量生成用户最邻近用户的列表
     logger.info("计算用户邻近的相似用户中....")
-    nearestUser = userNearestTopN()
+    nearestUser = userNearestTopK()
 
   }
 
 
   def userLikedItems(): Map[Int, Seq[Rating]] = {
-
-
-    val groupRDD = userHasItem
-    //1.计算用户的平均分
-    val userMean = groupRDD.map(r => {
-      val userLikes: Seq[Rating] = r._2.toList.sortBy(_.rating).reverse.take(ap.numUserLikeMovies)
+   userHadItem.map(r => {
+      val userLikes: Seq[Rating] = r._2.toList.sortBy(_.rating).reverse.take(ap.L)
       (r._1, userLikes)
     })
-    userMean
   }
 
-  def userNearestTopN(): mutable.Map[String, Double] = {
+  def userNearestTopK(): mutable.Map[String, Double] = {
     //afterClusterRDD: RDD[(Int, (Int, linalg.Vector))]
-    //                簇Index  Uid    评分向量
+    //                簇Index  (Uid    评分向量)
 
     //计算所有用户之间的相似度
     val userNearestAccumulator = new NearestUserAccumulator
 
     //1.考虑从族中进行计算相似度
-    for (idx <- 0 until ap.k) {
+    for (idx <- 0 until ap.CC) {
 
-      val curUsersVectors = afterClusterRDD.filter(_._1 == idx).map(_._2)
-      logger.info(s"簇$idx 中用户数量为：${curUsersVectors.length}")
+      val currentClusterUserVectors = afterClusterRDD.filter(_._1 == idx).map(_._2)
+      logger.info(s"簇$idx 中用户数量为：${currentClusterUserVectors.length}")
 
-      val uids = curUsersVectors.sortBy(_._1)
+      val uids = currentClusterUserVectors.sortBy(_._1)
 
       for {
         (u1, v1) <- uids
@@ -191,11 +183,11 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
         if u1 < u2
       } {
 
-        val score = if (ap.method.toLowerCase() == "cosine") {
+        val score = if (ap.SM.toLowerCase() == "cosine") {
           Correlation.getCosine(v1, v2)
-        } else if (ap.method.toLowerCase() == "improvedpearson") {
+        } else if (ap.SM.toLowerCase() == "improvedpearson") {
           Correlation.getImprovedPearson(v1, v2)
-        } else if (ap.method.toLowerCase() == "pearson") {
+        } else if (ap.SM.toLowerCase() == "pearson") {
           Correlation.getPearson(v1, v2)
         } else {
           throw new Exception("没有找到对应的方法。")
@@ -235,12 +227,12 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
     }).map(r => {
       val uid = r._1.replace(s",${query.user},", "").replace(",", "")
       (uid.toInt, r._2)
-    }).toSeq.sortBy(_._2).reverse.take(ap.numNearestUsers).toMap
+    }).toSeq.sortBy(_._2).reverse.take(ap.K).toMap
 
     //logger.info(s"${query.user}的相似用户列表的长度为：${userNearestMap.size}")
 
     //用户的已经观看列表
-    val currentUserSawSet = userHasItem(query.user).map(_.item)
+    val currentUserSawSet = userHadItem(query.user).map(_.item)
     logger.info(s"已经观看的列表长度为:${currentUserSawSet.size}")
 
     val result = userLikedMap.
@@ -259,10 +251,10 @@ class ClusterRecommender(ap: ClusterParams) extends Recommender {
         //userNearestMap(r.user)
         (r.item, r.rating * userNearestMap(r.user))
       }).groupBy(_._1).map(r => {
-      val itemid = r._1
+      val itemID = r._1
       val scores = r._2.map(_._2).sum
       //logger.info(s"累加的相似度：${scores},物品的评论数量:${itemCountSeq(r._1)}")
-      (itemid, scores)
+      (itemID, scores)
     })
 
     logger.info(s"生成候选物品列表的长度为：${result.size}")

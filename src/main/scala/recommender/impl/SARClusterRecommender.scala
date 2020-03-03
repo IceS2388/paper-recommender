@@ -12,17 +12,18 @@ import recommender.tools.{BiMap, Correlation, NearestUserAccumulator}
 import scala.collection.mutable
 
 case class SARClusterParams(
-                             clusterMethod: String = "BisectingKMeans",
-                             k: Int = 2,
-                             maxIterations: Int = 20,
-                             method: String = "Cosine",
-                             numNearestUsers: Int = 5,
-                             numUserLikeMovies: Int = 5) extends Params {
+                             CM: String = "BisectingKMeans", //聚类算法名
+                             CC: Int = 2, //类簇数量
+                             MI: Int = 20, //maxIterations最大迭代次数
+                             SM: String = "Cosine", //相似度计算方法
+                             K: Int = 5, //近邻的数目
+                             L: Int = 5 //用户喜欢的电影列表长度
+                           ) extends Params {
   override def getName(): String = {
-    this.getClass.getSimpleName.replace("Params", "") + s"_$clusterMethod"
+    this.getClass.getSimpleName.replace("Params", "") + s"_$CM"
   }
 
-  override def toString: String = s"聚类{聚类方法：$clusterMethod,簇心数量:$k,maxIterations:$maxIterations,相似度方法:$method,numNearestUsers:$numNearestUsers,numUserLikeMovies:$numUserLikeMovies}\r\n"
+  override def toString: String = s"聚类{聚类方法：$CM,簇心数量:$CC,最大迭代次数:$MI,相似度方法:$SM,近邻的数目:$K,用户喜欢的电影列表长度:$L}\r\n"
 }
 
 /**
@@ -37,27 +38,24 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
   override def getParams: Params = ap
 
 
-  override def prepare(data: Seq[Rating]): PrepairedData = {
+  override def prepare(data: Seq[Rating]): PreparedData = {
 
     require(data.nonEmpty, "原始数据不能为空！")
 
-
-    new PrepairedData(data)
+    new PreparedData(data)
   }
 
-  // 用户的评分向量
+  // 用户聚类后的评分向量
   private var afterClusterRDD: Seq[(Int, (Int, linalg.Vector))] = _
   // 训练集中用户所拥有item
   private var userGroup: Map[Int, Seq[Rating]] = _
-
-
-
+  // 用户的评分向量
   private var newUserVector: collection.Map[Int, linalg.Vector] = _
 
   override def train(data: TrainingData): Unit = {
 
     require(data.ratings.nonEmpty, "训练数据不能为空！")
-    require(Set("BisectingKMeans", "K-means", "GaussianMixture").contains(ap.clusterMethod), "聚类方法必须在是：[BisectingKMeans,K-means,GaussianMixture]其中之一!")
+    require(Set("BisectingKMeans", "K-means", "GaussianMixture").contains(ap.CM), "聚类方法必须在是：[BisectingKMeans,K-means,GaussianMixture]其中之一!")
 
     // 把数据按照用户进行分组
     userGroup = data.ratings.groupBy(_.user)
@@ -107,7 +105,6 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
 
     newUserVector = userVectors.toMap
 
-
   }
 
   /**
@@ -122,23 +119,23 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
     val dtrain = d.map(_._2)
 
     //选择聚类算法
-    if (ap.clusterMethod.toLowerCase() == "BisectingKMeans".toLowerCase) {
-      val bkm = new BisectingKMeans().setK(ap.k).setMaxIterations(ap.maxIterations)
+    if (ap.CM.toLowerCase() == "BisectingKMeans".toLowerCase) {
+      val bkm = new BisectingKMeans().setK(ap.CC).setMaxIterations(ap.MI)
       val model = bkm.run(dtrain)
 
 
       afterClusterRDD = userVectors.map(r => {
         (model.predict(r._2), r)
       })
-    } else if (ap.clusterMethod.toLowerCase() == "K-means".toLowerCase) {
-      val clusters = KMeans.train(dtrain, ap.k, ap.maxIterations)
+    } else if (ap.CM.toLowerCase() == "K-means".toLowerCase) {
+      val clusters = KMeans.train(dtrain, ap.CC, ap.MI)
 
 
       afterClusterRDD = userVectors.map(r => {
         (clusters.predict(r._2), r)
       })
-    } else if (ap.clusterMethod.toLowerCase() == "GaussianMixture".toLowerCase()) {
-      val gmm = new GaussianMixture().setK(ap.k).run(dtrain)
+    } else if (ap.CM.toLowerCase() == "GaussianMixture".toLowerCase()) {
+      val gmm = new GaussianMixture().setK(ap.CC).run(dtrain)
 
 
       afterClusterRDD = userVectors.map(r => {
@@ -151,30 +148,27 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
 
   private def userLikedItems(): Map[Int, Seq[Rating]] = {
 
-
-    val groupRDD = userGroup
-    //1.计算用户的平均分
-    val userMean = groupRDD.map(r => {
-      val userLikes: Seq[Rating] = r._2.toList.sortBy(_.rating).reverse.take(ap.numUserLikeMovies)
+    userGroup.map(r => {
+      val userLikes: Seq[Rating] = r._2.toList.sortBy(_.rating).reverse.take(ap.L)
       (r._1, userLikes)
     })
-    userMean
+
   }
 
   private def userNearestNeighbours(): mutable.Map[String, Double] = {
     //afterClusterRDD: RDD[(Int, (Int, linalg.Vector))]
-    //                簇Index  Uid    评分向量
+    //                簇Index  (Uid    评分向量)
 
     //计算所有用户之间的相似度
     val userNearestAccumulator = new NearestUserAccumulator
 
     //1.考虑从族中进行计算相似度
-    for (idx <- 0 until ap.k) {
+    for (idx <- 0 until ap.CC) {
 
-      val curUsersVectors = afterClusterRDD.filter(_._1 == idx).map(_._2)
-      logger.info(s"簇$idx 中用户数量为：${curUsersVectors.length}")
+      val currentClusterUserVectors = afterClusterRDD.filter(_._1 == idx).map(_._2)
+      logger.info(s"簇$idx 中用户数量为：${currentClusterUserVectors.length}")
 
-      val uids = curUsersVectors.sortBy(_._1)
+      val uids = currentClusterUserVectors.sortBy(_._1)
 
       for {
         (u1, v1) <- uids
@@ -182,11 +176,11 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
         if u1 < u2
       } {
 
-        val score = if (ap.method.toLowerCase() == "cosine") {
+        val score = if (ap.SM.toLowerCase() == "cosine") {
           Correlation.getCosine(v1, v2)
-        } else if (ap.method.toLowerCase() == "improvedpearson") {
+        } else if (ap.SM.toLowerCase() == "improvedpearson") {
           Correlation.getImprovedPearson(v1, v2)
-        } else if (ap.method.toLowerCase() == "pearson") {
+        } else if (ap.SM.toLowerCase() == "pearson") {
           Correlation.getPearson(v1, v2)
         } else {
           throw new Exception("没有找到对应的方法。")
@@ -220,20 +214,20 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
       return PredictedResult(Array.empty)
     }
 
-    //2. 获取推荐列表
+    //2. 获取最近用户列表
     val userNearestMap = userNearestRDD
       .map(r => {
         val uid = r._1.replace(s",${query.user},", "").replace(",", "")
         //近邻ID，相似度
         (uid.toInt, r._2)
-      }).toSeq.sortBy(_._2).reverse.take(ap.numNearestUsers).toMap
+      }).toSeq.sortBy(_._2).reverse.take(ap.K).toMap
 
 
     //3. 用户的已经观看列表
     val currentUserSawSet = userGroup(query.user).map(_.item).toSet
     logger.info(s"已经观看的电影列表长度为:${currentUserSawSet.size}")
 
-    //计算候选列表中，用户未观看的推荐度最高的前400个电影
+    //4.计算候选列表中，用户未观看的推荐度最高的前400个电影
     val candidateMovies = userLikedMap
       //在所有用户的喜欢列表中,查找当前用户的邻近用户相关的
       .filter(r => userNearestMap.contains(r._1))
@@ -245,9 +239,7 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
     })
       //计算每部电影的推荐程度=评分*相似度
       .map(r => {
-      //r.rating
-      //r.item
-      //userNearestMap(r.user)
+      //r.rating r.item userNearestMap(r.user)
       (r.item, r.rating * userNearestMap(r.user))
     })
       //聚合同一item的权重
@@ -256,18 +248,18 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
         val itemID = r._1
         val scores = r._2.map(_._2).sum
         (itemID, scores)
-      }).toArray.sortBy(_._2).reverse.take(400).map(_._1).toSet
+      }).toArray.sortBy(_._2).reverse.take(500).map(_._1).toSet
 
 
-
+    //5.计算推荐指数
     //对应候选列表的索引
     val candidateItems2Index = BiMap.toIndex(candidateMovies)
     val sawItems2Index = BiMap.toIndex(currentUserSawSet)
 
-    //1.生成用户关联矩阵
+    //5.1 生成用户关联矩阵
     val affinityMatrix = DenseMatrix.ones[Float](1, currentUserSawSet.size)
 
-    //2.生成item2item的相似度矩阵
+    //5.2 生成item2item的相似度矩阵
     val itemToItemMatrix: DenseMatrix[Float] = DenseMatrix.zeros[Float](currentUserSawSet.size, candidateMovies.size)
 
     //赋予矩阵相似度值,这个过程比较费时间
@@ -282,7 +274,7 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
       val index2 = candidateItems2Index(cID).toInt
       itemToItemMatrix.update(index1, index2, s)
     }
-    //生成推荐矩阵
+    //5.3 生成推荐矩阵
     val resultMatrix = affinityMatrix * itemToItemMatrix
     val row = resultMatrix(0, ::)
 
@@ -293,7 +285,7 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
     }).sortBy(_._2).reverse.take(query.num)
 
 
-    // 返回权重归一化
+    // 6.返回权重并归一化
     val sum: Double = result.map(_._2).sum
     if (sum == 0) return PredictedResult(Array.empty)
 
@@ -305,6 +297,5 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
     //排序，返回结果
     PredictedResult(returnResult)
   }
-
 
 }

@@ -26,9 +26,9 @@ class SARRecommender(ap: SARParams) extends Recommender {
 
   override def getParams: Params = ap
 
-  override def prepare(data: Seq[Rating]): PrepairedData = {
+  override def prepare(data: Seq[Rating]): PreparedData = {
 
-    new PrepairedData(data)
+    new PreparedData(data)
   }
 
   private var userId2Index: BiMap[Int, Long] = _

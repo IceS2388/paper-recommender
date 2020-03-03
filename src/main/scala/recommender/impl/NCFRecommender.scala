@@ -50,7 +50,7 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
   ////每个用户所有的物品=训练集中的物品+测试集中的物品
   private var allUserHadItemsMap: Map[Int, Set[Int]] = _
 
-  override def prepare(data: Seq[Rating]): PrepairedData = {
+  override def prepare(data: Seq[Rating]): PreparedData = {
 
 
     allUserHadItemsMap = data.groupBy(_.user).map(r => {
@@ -58,7 +58,7 @@ class NCFRecommender(ap: NCFParams) extends Recommender {
     })
 
     //数据分割前
-    new PrepairedData(data)
+    new PreparedData(data)
   }
 
   private var newItemVector: collection.Map[Int, linalg.Vector] = _

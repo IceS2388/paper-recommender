@@ -1,7 +1,7 @@
 package recommender
 
 /**
-  * TrainingData包含所有上面定义的Rating类型数据。
+  * 原始数据分割后，用于训练的数据。
   **/
 class TrainingData(val ratings: Seq[Rating]) {
   override def toString = {

@@ -51,7 +51,7 @@ class SARNCFClusterRecommender(ap: SARNCFClusterParams) extends Recommender {
   //每个用户所有的物品
   private var userAllItemSet: Map[Int, Set[Int]] = _
 
-  override def prepare(data: Seq[Rating]): PrepairedData = {
+  override def prepare(data: Seq[Rating]): PreparedData = {
 
     require(data.nonEmpty, "原始数据不能为空！")
 
@@ -62,7 +62,7 @@ class SARNCFClusterRecommender(ap: SARNCFClusterParams) extends Recommender {
       (userId, itemSet)
     })
 
-    new PrepairedData(data)
+    new PreparedData(data)
   }
 
   // 用户的评分向量

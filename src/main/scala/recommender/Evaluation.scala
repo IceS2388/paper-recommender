@@ -59,25 +59,6 @@ class Evaluation {
     fw.close()
 
 
-    /* val trainingData = data._1
-     val testingData = data._2
-
-     logger.info("训练模型中...")
-     recommender.train(trainingData)
-
-
-     val resultFile = Paths.get(s"result/${recommender.getParams.getName()}_${new SimpleDateFormat("yyyyMMddHHmmss").format(new Date)}.txt").toFile
-     val fw = new FileWriter(resultFile)
-
-     logger.info("训练模型完毕，开始进行预测评估")
-     val vmean = calulate(testingData, recommender)
-     fw.append(recommender.getParams.toString+"\r\n")
-     fw.append(s"训练数据：${trainingData.ratings.size}条,测试数据:${testingData.size}\r\n")
-     fw.append(s"平均值:$vmean \r\n")
-
-     logger.info("最终的平均值" + vmean.toString)
-     fw.close()*/
-
 
   }
 
@@ -109,11 +90,7 @@ class Evaluation {
 
       val actuallyItems = r._2.ratings.map(ar => ar.item)
       val predictedItems = predicts.itemScores.map(ir => ir.item)
-      /*logger.info("实际值")
-      actuallyItems.foreach(println)
-      logger.info("预测值")
-      predictedItems.foreach(println)
-      Thread.sleep(4000)*/
+
       if (predictedItems.length == 0) {
         //返回每一个用户ID的验证结果
         val re = VerifiedResult(0, 0, 0, System.currentTimeMillis() - startTime)

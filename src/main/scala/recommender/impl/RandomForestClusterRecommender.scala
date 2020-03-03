@@ -60,7 +60,7 @@ class RandomForestClusterRecommender(ap: RandomForestClusterParams) extends Reco
   //每个用户所有的物品
   private var allUserHadItemsMap: Map[Int, Set[Int]] = _
 
-  override def prepare(data: Seq[Rating]): PrepairedData = {
+  override def prepare(data: Seq[Rating]): PreparedData = {
 
     allUserHadItemsMap = data.groupBy(_.user).map(r => {
       val userId = r._1
@@ -69,7 +69,7 @@ class RandomForestClusterRecommender(ap: RandomForestClusterParams) extends Reco
       (userId, itemSet)
     })
     //数据分割前
-    new PrepairedData(data)
+    new PreparedData(data)
   }
 
 

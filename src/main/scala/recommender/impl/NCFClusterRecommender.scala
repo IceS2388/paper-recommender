@@ -64,7 +64,7 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
   private var dimItemID: Int = _
 
 
-  override def prepare(data: Seq[Rating]): PrepairedData = {
+  override def prepare(data: Seq[Rating]): PreparedData = {
 
     //val hitFile = Paths.get("spark-warehouse", s"hitRecord_${new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date)}.txt").toFile()
     //fw = new FileWriter(hitFile)
@@ -83,7 +83,7 @@ class NCFClusterRecommender(ap: NCFClusterParams) extends Recommender {
     }
 
     //数据分割前
-    new PrepairedData(data)
+    new PreparedData(data)
   }
 
   private var newItemVector: collection.Map[Int, linalg.Vector] = _

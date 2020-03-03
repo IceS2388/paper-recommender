@@ -9,7 +9,7 @@ import scala.io.Source
   * Author:IceS
   * Date:2019-08-09 15:17:01
   * Description:
-  * 数据源
+  * 数据源，用于读取数据和分割数据。
   */
 class DataSource(dataFilePath: String = "data/u.data") {
   @transient lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -23,7 +23,7 @@ class DataSource(dataFilePath: String = "data/u.data") {
     }).toSeq
   }
 
-  def splitRatings(kFold: Int, topN: Int, originRatings: PrepairedData): Seq[(TrainingData, Map[Query, ActualResult])] = {
+  def splitRatings(kFold: Int, topN: Int, originRatings: PreparedData): Seq[(TrainingData, Map[Query, ActualResult])] = {
 
     val ratings: Seq[(Rating, Int)] = originRatings.ratings.zipWithIndex
 

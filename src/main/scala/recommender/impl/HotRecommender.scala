@@ -21,8 +21,8 @@ class HotRecommender(ap: HotParams) extends Recommender {
 
   override def getParams: Params = ap
 
-  override def prepare(data: Seq[Rating]): PrepairedData = {
-    new PrepairedData(data)
+  override def prepare(data: Seq[Rating]): PreparedData = {
+    new PreparedData(data)
   }
 
   private var hotestMovies: Array[(Int, Int)] = _

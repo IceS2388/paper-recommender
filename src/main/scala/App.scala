@@ -12,11 +12,11 @@ object App {
   def main(args: Array[String]): Unit = {
 
     //runKerasCluster()
-    //runSARCluster()
+    runSARCluster()
     //runBase()
     //runCluster()
     //runRandomClusterForest()
-    runNCFCluster()
+    //runNCFCluster()
     //runNCF()
     //runSAR()
     //runHot()
@@ -49,7 +49,7 @@ object App {
   def runSARCluster():Unit={
     val args = List(
       //最优参数：K:4,maxIterations:10,numNearestUsers:240,numUserLikeMovies=240
-      SARClusterParams(k=4,maxIterations = 10,numNearestUsers = 240,numUserLikeMovies = 240)
+      SARClusterParams(CC=4,MI = 10,K = 240,L = 240)
     )
     for (elem <- args) {
       val recommender = new SARClusterRecommender(elem)

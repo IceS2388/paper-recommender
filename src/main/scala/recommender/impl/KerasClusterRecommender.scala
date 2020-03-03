@@ -49,7 +49,7 @@ class KerasClusterRecommender(ap: KerasClusterParams) extends Recommender {
   //用户的评分向量
   private var afterClusterRDD: Array[(Int, (Int, linalg.Vector))] = _
 
-  override def prepare(data: Seq[Rating]): PrepairedData = {
+  override def prepare(data: Seq[Rating]): PreparedData = {
 
     //val hitFile = Paths.get("spark-warehouse", s"hitRecord_${new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss").format(new Date)}.txt").toFile()
 
@@ -62,7 +62,7 @@ class KerasClusterRecommender(ap: KerasClusterParams) extends Recommender {
       (userId, itemSet)
     })
     //数据分割前
-    new PrepairedData(data)
+    new PreparedData(data)
   }
 
 
