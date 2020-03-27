@@ -37,23 +37,24 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
 
   override def getParams: Params = ap
 
-
   override def prepare(data: Seq[Rating]): PreparedData = {
-
     require(data.nonEmpty, "原始数据不能为空！")
-
     new PreparedData(data)
   }
-
   // 用户聚类后的评分向量
   private var afterClusterRDD: Seq[(Int, (Int, linalg.Vector))] = _
   // 训练集中用户所拥有item
   private var userGroup: Map[Int, Seq[Rating]] = _
   // 用户的评分向量
   private var newUserVector: collection.Map[Int, linalg.Vector] = _
+  // 用户看过电影的前TopN
+  private var userLikedMap: Map[Int, Seq[Rating]] = _
+  // 与用户相似度最高的前n个用户
+  private var nearestUser: mutable.Map[String, Double] = _
+  // 根据物品分组，用于创建物品特征
+  private var itemsGroup: Map[Int, Set[Int]] = _
 
   override def train(data: TrainingData): Unit = {
-
     require(data.ratings.nonEmpty, "训练数据不能为空！")
     require(Set("BisectingKMeans", "K-means", "GaussianMixture").contains(ap.CM), "聚类方法必须在是：[BisectingKMeans,K-means,GaussianMixture]其中之一!")
 
@@ -63,18 +64,13 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
     itemsGroup = data.ratings.groupBy(_.item).map(r => (r._1, r._2.map(_.user).toSet))
     // 初始化新的特征向量
     initVectors(data)
-
     /** -------------------对用户评分向量进行聚类--------------------- **/
     clusterUsers(newUserVector.toSeq)
-
     // 获取每个用户在观看记录中，评分最靠前的N个电影
     userLikedMap = userLikedItems()
-
     // 根据用户评分向量生成用户最邻近用户的列表
     logger.info("计算用户邻近的相似用户中....")
     nearestUser = userNearestNeighbours()
-
-
   }
 
   private def initVectors(data: TrainingData): Unit = {
@@ -86,7 +82,6 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
       var c3 = 0D //3.0
       var c4 = 0D //4.0
       var c5 = 0D //5.0
-
       r._2.foreach(r2 => {
         if (r2.rating == 1.0)
           c1 += 1
@@ -99,10 +94,8 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
         else
           c5 += 1
       })
-
       (uid, Vectors.dense(c1, c2, c3, c4, c5))
     }).toSeq
-
     newUserVector = userVectors.toMap
 
   }
@@ -114,62 +107,47 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
     logger.info("正在对用户评分向量进行聚类，需要些时间...")
     //3.准备聚类
     val sparkSession = SparkSession.builder().master("local[*]").appName(this.getClass.getSimpleName).getOrCreate()
-
     val d = sparkSession.sparkContext.parallelize(userVectors)
     val dtrain = d.map(_._2)
-
     //选择聚类算法
     if (ap.CM.toLowerCase() == "BisectingKMeans".toLowerCase) {
       val bkm = new BisectingKMeans().setK(ap.CC).setMaxIterations(ap.MI)
       val model = bkm.run(dtrain)
-
-
       afterClusterRDD = userVectors.map(r => {
         (model.predict(r._2), r)
       })
     } else if (ap.CM.toLowerCase() == "K-means".toLowerCase) {
       val clusters = KMeans.train(dtrain, ap.CC, ap.MI)
-
-
       afterClusterRDD = userVectors.map(r => {
         (clusters.predict(r._2), r)
       })
     } else if (ap.CM.toLowerCase() == "GaussianMixture".toLowerCase()) {
       val gmm = new GaussianMixture().setK(ap.CC).run(dtrain)
-
-
       afterClusterRDD = userVectors.map(r => {
         (gmm.predict(r._2), r)
       })
     }
-
     sparkSession.close()
   }
 
   private def userLikedItems(): Map[Int, Seq[Rating]] = {
-
     userGroup.map(r => {
       val userLikes: Seq[Rating] = r._2.toList.sortBy(_.rating).reverse.take(ap.L)
       (r._1, userLikes)
     })
-
   }
 
   private def userNearestNeighbours(): mutable.Map[String, Double] = {
-    //afterClusterRDD: RDD[(Int, (Int, linalg.Vector))]
-    //                簇Index  (Uid    评分向量)
 
     //计算所有用户之间的相似度
     val userNearestAccumulator = new NearestUserAccumulator
 
     //1.考虑从族中进行计算相似度
     for (idx <- 0 until ap.CC) {
-
       val currentClusterUserVectors = afterClusterRDD.filter(_._1 == idx).map(_._2)
       logger.info(s"簇$idx 中用户数量为：${currentClusterUserVectors.length}")
 
       val uids = currentClusterUserVectors.sortBy(_._1)
-
       for {
         (u1, v1) <- uids
         (u2, v2) <- uids
@@ -192,16 +170,9 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
       }
       logger.info(s"累加器数据条数：${userNearestAccumulator.value.size}条记录.")
     }
-
     userNearestAccumulator.value
   }
 
-  // 用户看过电影的前TopN
-  private var userLikedMap: Map[Int, Seq[Rating]] = _
-  // 与用户相似度最高的前n个用户
-  private var nearestUser: mutable.Map[String, Double] = _
-  // 根据物品分组，用于创建物品特征
-  private var itemsGroup: Map[Int, Set[Int]] = _
 
   override def predict(query: Query): PredictedResult = {
     //1. 查看用户是否有相似度用户
@@ -221,7 +192,6 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
         //近邻ID，相似度
         (uid.toInt, r._2)
       }).toSeq.sortBy(_._2).reverse.take(ap.K).toMap
-
 
     //3. 用户的已经观看列表
     val currentUserSawSet = userGroup(query.user).map(_.item).toSet
@@ -250,18 +220,14 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
         (itemID, scores)
       }).toArray.sortBy(_._2).reverse.take(500).map(_._1).toSet
 
-
     //5.计算推荐指数
     //对应候选列表的索引
     val candidateItems2Index = BiMap.toIndex(candidateMovies)
     val sawItems2Index = BiMap.toIndex(currentUserSawSet)
-
     //5.1 生成用户关联矩阵
     val affinityMatrix = DenseMatrix.ones[Float](1, currentUserSawSet.size)
-
     //5.2 生成item2item的相似度矩阵
     val itemToItemMatrix: DenseMatrix[Float] = DenseMatrix.zeros[Float](currentUserSawSet.size, candidateMovies.size)
-
     //赋予矩阵相似度值,这个过程比较费时间
     for {
       sawID <- currentUserSawSet
@@ -269,7 +235,6 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
     } {
       //计算相关系数值
       val s = Correlation.getJaccardSAR(1, sawID, cID, itemsGroup).toFloat
-
       val index1 = sawItems2Index(sawID).toInt
       val index2 = candidateItems2Index(cID).toInt
       itemToItemMatrix.update(index1, index2, s)
@@ -277,23 +242,19 @@ class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
     //5.3 生成推荐矩阵
     val resultMatrix = affinityMatrix * itemToItemMatrix
     val row = resultMatrix(0, ::)
-
     val indexToItem: BiMap[Long, Int] = candidateItems2Index.inverse
     //索引变成itemID
     val result = indexToItem.toSeq.map(r => { //r._1:index,r._2:权重
       (r._2, row.apply(r._1.toInt))
     }).sortBy(_._2).reverse.take(query.num)
 
-
     // 6.返回权重并归一化
     val sum: Double = result.map(_._2).sum
     if (sum == 0) return PredictedResult(Array.empty)
-
     val weight = 1.0
     val returnResult = result.map(r => {
       ItemScore(r._1, r._2 / sum * weight)
     }).toArray
-
     //排序，返回结果
     PredictedResult(returnResult)
   }

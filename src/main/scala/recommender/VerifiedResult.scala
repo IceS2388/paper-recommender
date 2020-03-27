@@ -9,6 +9,7 @@ case class VerifiedResult(precision: Double, recall: Double, f1: Double, exectim
   }
 
   def +(other: VerifiedResult): VerifiedResult = {
-    VerifiedResult(this.precision + other.precision, this.recall + other.recall, this.f1 + other.f1, this.exectime + other.exectime)
+    VerifiedResult(this.precision + other.precision, this.recall + other.recall, this.f1 +
+      other.f1, this.exectime + other.exectime)
   }
 }

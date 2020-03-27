@@ -18,7 +18,6 @@ class Evaluation {
   @transient private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   def run(recommender: Recommender): Unit = {
-
     //: Seq[(TrainingData, Map[Query, ActualResult])]
     val ds = new DataSource()
     logger.info("读取所有数据，并进行初始处理。")

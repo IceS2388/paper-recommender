@@ -13,23 +13,19 @@ import scala.io.Source
   */
 class DataSource(dataFilePath: String = "data/u.data") {
   @transient lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
-
   def getRatings(): Seq[Rating] = {
-
     Source.fromFile(dataFilePath).getLines().map(line => {
       val data = line.toString.trim.split("\t")
       /* logger.info(line)*/
       Rating(user = data(0).toInt, item = data(1).toInt, rating = data(2).toDouble, timestamp = data(3).toLong)
     }).toSeq
   }
-
   def splitRatings(kFold: Int, topN: Int, originRatings: PreparedData): Seq[(TrainingData, Map[Query, ActualResult])] = {
 
     val ratings: Seq[(Rating, Int)] = originRatings.ratings.zipWithIndex
 
     (0 until kFold).map(idx => {
       logger.info(s"正在进行${idx + 1}次数据分割.")
-
 
       //训练集:每条Rating的索引%KFold，若余数不等于当前idx，则添加到训练集
       val trainingRatings = ratings.filter(_._2 % kFold != idx).map(_._1)
