@@ -78,6 +78,9 @@
 
 ## 项目结构介绍
 
-![](E:\计算机及其应用\projects\paper-recommender\pics\project-struct.PNG)
+![](.\pics\project-struct.PNG)
 
 其中src/main/scala/Recommender.scala是定义推荐算法必须实现的接口，其具体实现在src/main/scala/impl中。每个算法的介绍请在impl文件夹下查看，运行结果在result文件夹中。
+
+## 主要工作
+主要是改进了SAR算法，融合聚类协同算法，使其理论上可运行大量数据的平台。
