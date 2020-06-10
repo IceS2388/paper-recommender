@@ -72,9 +72,12 @@
 
 ## 环境配置
 
-1. 技术：Scala 2.11.12 + Spark 2.1.3 + DeepLearning4j  
+1. 技术：Scala 2.11.12 + Spark 2.1.3 + DeepLearning4j  (详细看build.sbt文件中的内容)
 
 2. 环境：IntelliJ IDEA 2018.3.2 (Community Edition)
 
-## 算法介绍
+## 项目结构介绍
 
+![](E:\计算机及其应用\projects\paper-recommender\pics\project-struct.PNG)
+
+其中src/main/scala/Recommender.scala是定义推荐算法必须实现的接口，其具体实现在src/main/scala/impl中。每个算法的介绍请在impl文件夹下查看，运行结果在result文件夹中。

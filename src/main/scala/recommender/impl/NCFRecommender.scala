@@ -22,9 +22,8 @@ import scala.util.Random
   * Author:IceS
   * Date:2019-08-12 19:10:11
   * Description:
-  * 著名的神经网络协同过滤模型
-  * 存储的NCF，候选集为所有物品
-  *
+  * 著名的神经网络协同过滤模型.github地址https://github.com/hexiangnan/neural_collaborative_filtering
+  * 此处尝试但是one hot编码效果不理想，改成其他特征值对象。
   *
   */
 case class NCFParams() extends Params {

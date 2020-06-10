@@ -26,7 +26,7 @@ import scala.util.Random
   * Author:IceS
   * Date:2019-09-03 12:08:26
   * Description:
-  * NONE
+  * 想要用NCFCluster生成的候选集，生成最终的推荐列表。但是NCFCluster的效果并不好，这个算法不算成功。
   */
 case class SARNCFClusterParams(
                                 clusterMethod: String = "BisectingKMeans",

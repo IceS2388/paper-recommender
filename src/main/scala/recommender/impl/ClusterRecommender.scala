@@ -14,7 +14,7 @@ import scala.collection.mutable
   * Author:IceS
   * Date:2019-08-10 23:27:26
   * Description:
-  * 这个类的重点是测试聚类算法
+  * 这个类的重点是测试聚类算法搭配各种相似度算法的效果。
   */
 case class ClusterParams(
                           CM: String = "BisectingKMeans", //聚类算法名

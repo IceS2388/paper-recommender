@@ -19,7 +19,7 @@ import scala.util.Random
   * Author:IceS
   * Date:2019-09-02 19:13:32
   * Description:
-  * 使用Keras模型来尝试推荐
+  * 使用Keras模型来尝试推荐,使用某个用Phyton训练好的模型，在本类中直接调用该模型来实现分类。这是个尝试类。
   */
 case class KerasClusterParams(
                                method: String = "Cosine",

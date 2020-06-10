@@ -9,8 +9,8 @@ import recommender.tools.{BiMap, Correlation}
   * Author:IceS
   * Date:2019-08-12 17:41:56
   * Description:
-  * 简单推荐算法实现
-  * item co-occurrence and item similarity:item-item维度的矩阵，值为两个物品拥有共同用户的个数
+  * 简单推荐算法实现原始python实现的github地址为：https://github.com/microsoft/recommenders/blob/master/notebooks/00_quick_start/sar_movielens.ipynb
+  *
   */
 case class SARParams() extends Params {
   override def getName(): String = {

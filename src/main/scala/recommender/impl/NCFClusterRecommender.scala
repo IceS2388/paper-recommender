@@ -4,7 +4,7 @@ package recommender.impl
   * Author:IceS
   * Date:2019-08-18 16:29:57
   * Description:
-  * 结合NCF和Cluster集群算法
+  * 结合NCF和Cluster集群算法。先聚类生成用户的特征值，然后再使用NCF。
   */
 
 import org.apache.spark.mllib.clustering.BisectingKMeans

@@ -5,7 +5,7 @@ import recommender.impl._
   * Author:IceS
   * Date:2019-08-09 15:12:37
   * Description:
-  * NONE
+  * 运行很简单，调参有点复杂。
   */
 object App {
 

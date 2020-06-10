@@ -30,7 +30,7 @@ case class SARClusterParams(
   * Author:IceS
   * Date:2019-08-27 15:22:20
   * Description:
-  * NONE
+  * 综合先用用户聚类的协同过滤算法，生成每个用户的推荐候选列表，然后使用SAR算法生成最终的推荐结果。请先了解SAR算法。
   */
 class SARClusterRecommender(ap: SARClusterParams) extends Recommender {
   @transient private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)

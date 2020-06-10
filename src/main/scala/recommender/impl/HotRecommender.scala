@@ -7,7 +7,7 @@ import recommender._
   * Author:IceS
   * Date:2019-08-12 10:14:41
   * Description:
-  * 作为对比，热榜推荐。
+  * 作为对比，热榜(ItemPop)推荐。
   */
 case class HotParams() extends Params {
   override def getName(): String = this.getClass.getSimpleName.replace("Params", "")

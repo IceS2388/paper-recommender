@@ -4,7 +4,7 @@ package recommender.impl
   * Author:IceS
   * Date:2019-08-10 11:15:48
   * Description:
-  * 纯粹的Pearson相似度验证
+  * 单纯利用用户与用户之间的相似度来生成相邻用户列表，没有聚类。直接每个用户直接计算相似度，计算相似度的方法有所不同。其结果已经有论文证明了。在paper文件夹下的A new user similarity model to improve the accuracy of collaborative.pdf中，有详细对比并列出了数据做对比，一般还是用经典的余弦相似度算法比较好。
   */
 
 import org.slf4j.{Logger, LoggerFactory}

@@ -12,7 +12,7 @@ import org.slf4j.{Logger, LoggerFactory}
   * Author:IceS
   * Date:2019-08-09 15:20:35
   * Description:
-  * NONE
+  * 评估类
   */
 class Evaluation {
   @transient private lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)

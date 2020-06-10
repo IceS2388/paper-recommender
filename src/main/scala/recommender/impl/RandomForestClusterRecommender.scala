@@ -4,7 +4,7 @@ package recommender.impl
   * Author:IceS
   * Date:2019-08-18 07:52:37
   * Description:
-  * 1.修改为简单评分向量生成法则 2019年8月24日
+  * 利用sparkMLib的开源算法库来实现分类推荐。 其实本算法属于评分预测类的算法，不适用于TopN预测。
   *
   */
 
