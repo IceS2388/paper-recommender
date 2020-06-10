@@ -32,9 +32,9 @@
 
    在本论文推荐算法生成的推荐列表中的电影，都代表预测结果为正例。因为预测结果为负例的电影，即用户不会看的电影，不会推荐给用户。预测结果中包含推荐后用户确实观看的电影(TP)，和推荐了但是没有观看的电影(FP)。而测试集中用户的电影列表都是真实情况的正例，其中包含被预测结果命中的正例(TP)和不包含在推荐列表中的反例(FN)。
 
-   * 准确率    ![img](.\pics\clip_image001.gif)   
-   * 召回率    ![](.\pics\clip_image002.gif) 
-   * F1分数    ![img](.\pics\clip_image003.gif)  
+   * 准确率    ![img](pics/clip_image001.gif)   
+   * 召回率    ![img](pics/clip_image002.gif) 
+   * F1分数    ![img](pics/clip_image003.gif)  
 
 4. 评测方法:
 
@@ -58,7 +58,7 @@
 
 ## 程序架构
 
-![如图所示](.\pics\program.png)
+![img](pics/program.png)
 
 整个程序分为数据处理模块、训练模块、预测模块、评估模块。
 
@@ -78,7 +78,7 @@
 
 ## 项目结构介绍
 
-![](.\pics\project-struct.PNG)
+![img](pics/project-struct.PNG)
 
 其中src/main/scala/Recommender.scala是定义推荐算法必须实现的接口，其具体实现在src/main/scala/impl中。每个算法的介绍请在impl文件夹下查看，运行结果在result文件夹中。
 
