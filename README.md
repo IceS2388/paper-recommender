@@ -133,7 +133,7 @@
 
 ![img](./pics/wpsORce46.jpg) 
 
-​	其中![img](./pics/wpsH1sXs9.jpg)表示关联矩阵**A**中第i列的值，![img](./pics/wpsbFaz88.jpg)表示相似度矩阵![img](file:////tmp/wps-ices/ksohtml/wpswF4cc7.jpg)中第i行第j列的值。
+​	其中![img](./pics/wpsH1sXs9.jpg)表示关联矩阵**A**中第i列的值，![img](./pics/wpsbFaz88.jpg)表示相似度矩阵**S**中第i行第j列的值。
 
 ### 部分测试数据
 
